@@ -47,7 +47,8 @@ local function set_cursor_for_popup_win(blackboard_state, target_line, mark_char
 end
 
 ---@param blackboard_state blackboard.State
-local function show_fullscreen_popup_at_mark(blackboard_state, mark_info)
+---@param marks_info blackboard.MarkInfo[]
+local function show_fullscreen_popup_at_mark(blackboard_state, marks_info)
   local mark_char = Get_mark_char(blackboard_state)
   if not mark_char then
     return
@@ -56,7 +57,7 @@ local function show_fullscreen_popup_at_mark(blackboard_state, mark_info)
   end
   blackboard_state.current_mark = mark_char
 
-  local mark_info = Retrieve_mark_info(mark_info, mark_char)
+  local mark_info = Retrieve_mark_info(marks_info, mark_char)
   local target_line = mark_info.line
 
   local file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
@@ -110,7 +111,7 @@ function Attach_autocmd_blackboard_buf(blackboard_state, marks_info)
       end
     end,
   })
-  local bb = require 'config.blackboard'
+  local bb = require 'blackboard'
   vim.keymap.set('n', '<CR>', function()
     bb.jump_to_mark(blackboard_state)
   end, { noremap = true, silent = true, buffer = blackboard_state.blackboard_buf })
