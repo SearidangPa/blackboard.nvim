@@ -358,6 +358,10 @@ end
 
 vim.api.nvim_create_user_command('BlackboardPreviewMark', function(opts)
   local mark = opts.fargs[1]
+  if not mark then
+    print 'No mark provided'
+    return
+  end
   M.preview_mark(mark)
 end, { nargs = '*' })
 
