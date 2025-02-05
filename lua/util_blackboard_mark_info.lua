@@ -15,7 +15,7 @@ local function nearest_function_at_line(bufnr, line)
   local function traverse(node)
     local nearest_function = nil
     for child in node:iter_children() do
-      if child:type() == 'function_declaration' or child:type() == 'method_declaration' then
+      if child:type() == 'function_declaration' or child:type() == 'method_declaration' or child:type() == 'function_definition' then
         local start_row, _, end_row, _ = child:range()
         if start_row <= line and end_row >= line then
           for subchild in child:iter_children() do
