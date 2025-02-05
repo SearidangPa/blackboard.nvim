@@ -301,7 +301,7 @@ M.toggle_mark_window = function()
   local marks_info = Get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
-  load_all_file_contents(options)
+  load_all_file_contents(blackboard_state.show_nearest_func)
   attach_autocmd_blackboard_buf(marks_info)
 end
 
