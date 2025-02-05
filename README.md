@@ -1,5 +1,5 @@
 ## What is Blackboard? 
-* It is a quick and accessible way to view your mark. 
+* It is a quick and accessible way to view your marks. 
 
 ## Demo
 https://github.com/user-attachments/assets/cdce5440-0cde-4947-9c99-57709621db84
