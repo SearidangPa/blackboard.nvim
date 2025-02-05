@@ -1,1 +1,1 @@
-<blockquote class="imgur-embed-pub" lang="en" data-id="a/ZzLHjWW"  ><a href="//imgur.com/a/ZzLHjWW">blackboard.nvim</a></blockquote><script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>
+![Preview](https://i.imgur.com/AVpZJyL.mp4)
