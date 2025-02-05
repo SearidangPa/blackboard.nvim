@@ -234,6 +234,7 @@ local function add_virtual_lines(parsedMarks)
     local funcLine = make_func_line(data)
     local extmarkLine = lineNum - 1
 
+    local virt_lines
     if extmarkLine == 1 then
       vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, ns_blackboard, 0, 0, {
         virt_lines = { { { filename, 'FileHighlight' } } },
@@ -241,18 +242,21 @@ local function add_virtual_lines(parsedMarks)
         hl_mode = 'combine',
         priority = 10,
       })
-    elseif extmarkLine > 1 then
-      local virt_lines = get_virtual_lines(filename, funcLine, last_seen_filename, last_seen_func, blackboard_state.show_nearest_func)
-      if virt_lines then
-        vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, ns_blackboard, extmarkLine, 0, {
-          virt_lines = virt_lines,
-          virt_lines_above = true,
-          hl_mode = 'combine',
-          priority = 10,
-        })
+      if blackboard_state.show_nearest_func and funcLine ~= '' then
+        virt_lines = { { { funcLine, '@function' } } }
       end
+    elseif extmarkLine > 1 then
+      virt_lines = get_virtual_lines(filename, funcLine, last_seen_filename, last_seen_func, blackboard_state.show_nearest_func)
     end
 
+    if virt_lines then
+      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, ns_blackboard, extmarkLine, 0, {
+        virt_lines = virt_lines,
+        virt_lines_above = true,
+        hl_mode = 'combine',
+        priority = 10,
+      })
+    end
     last_seen_filename = filename
     last_seen_func = funcLine
   end
@@ -281,7 +285,7 @@ local function create_new_blackboard(marks_info)
   vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
 
   vim.api.nvim_win_set_width(blackboard_state.blackboard_win, math.floor(vim.o.columns / 4))
-  vim.wo[blackboard_state.blackboard_win].number = false
+  vim.wo[blackboard_state.blackboard_win].number = true
   vim.wo[blackboard_state.blackboard_win].relativenumber = false
   vim.wo[blackboard_state.blackboard_win].wrap = false
 end
