@@ -282,11 +282,12 @@ local function create_new_blackboard(marks_info)
   vim.api.nvim_buf_set_lines(blackboard_state.blackboard_buf, 0, -1, false, parsed_marks_info.blackboardLines)
   add_highlights(parsed_marks_info)
   add_virtual_lines(parsed_marks_info)
-  vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
 
   vim.api.nvim_win_set_width(blackboard_state.blackboard_win, math.floor(vim.o.columns / 4))
   vim.wo[blackboard_state.blackboard_win].number = false
+  vim.wo[blackboard_state.blackboard_win].relativenumber = false
   vim.wo[blackboard_state.blackboard_win].wrap = false
+  vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
 end
 
 M.toggle_mark_window = function()
