@@ -52,8 +52,7 @@ end
 ---@field text string
 
 ---@param marks_info blackboard.MarkInfo[]
----@param options blackboard.Options
-local function add_mark_info(marks_info, mark, bufnr, line, col, options)
+local function add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
   local filepath = vim.api.nvim_buf_get_name(bufnr)
   if not vim.uv.fs_stat(filepath) then
     return
@@ -61,7 +60,7 @@ local function add_mark_info(marks_info, mark, bufnr, line, col, options)
   local filetype = plenary_filetype.detect_from_extension(filepath)
   vim.bo[bufnr].filetype = filetype
 
-  local nearest_func = options.show_nearest_func and nearest_function_at_line(bufnr, line) or nil
+  local nearest_func = show_nearest_func and nearest_function_at_line(bufnr, line) or nil
   local text = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ''
   local filename = vim.fn.fnamemodify(filepath, ':t')
   table.insert(marks_info, {
@@ -78,7 +77,7 @@ local function add_mark_info(marks_info, mark, bufnr, line, col, options)
 end
 
 ---@param marks_info blackboard.MarkInfo[]
-local function add_local_marks(marks_info, options)
+local function add_local_marks(marks_info, show_nearest_func)
   local mark_list = vim.fn.getmarklist(vim.api.nvim_get_current_buf())
 
   for _, mark_entry in ipairs(mark_list) do
@@ -89,14 +88,14 @@ local function add_local_marks(marks_info, options)
       local col = mark_entry.pos[3]
 
       if vim.api.nvim_buf_is_valid(bufnr) then
-        add_mark_info(marks_info, mark, bufnr, line, col, options)
+        add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
       end
     end
   end
 end
 
 ---@param marks_info blackboard.MarkInfo[]
-local function add_global_mark_info(marks_info, char, cwd, options)
+local function add_global_mark_info(marks_info, char, cwd, show_nearest_func)
   local mark = string.char(char)
   local pos = vim.fn.getpos("'" .. mark)
   if pos[1] == 0 then
@@ -113,7 +112,7 @@ local function add_global_mark_info(marks_info, char, cwd, options)
     return
   end
   if vim.api.nvim_buf_is_valid(bufnr) then
-    add_mark_info(marks_info, mark, bufnr, line, col, options)
+    add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
   end
 end
 
@@ -149,15 +148,14 @@ function Group_marks_info_by_filepath(all_accessible_marks)
   return grouped_marks
 end
 
----@param options blackboard.Options
 ---@return blackboard.MarkInfo[]
-function Get_accessible_marks_info(options)
+function Get_accessible_marks_info(show_nearest_func)
   local marks_info = {}
   local cwd = vim.fn.getcwd()
   for char = string.byte 'A', string.byte 'Z' do
-    add_global_mark_info(marks_info, char, cwd, options)
+    add_global_mark_info(marks_info, char, cwd, show_nearest_func)
   end
-  add_local_marks(marks_info, options)
+  add_local_marks(marks_info, show_nearest_func)
 
   return marks_info
 end
