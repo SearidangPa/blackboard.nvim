@@ -100,6 +100,86 @@ local function parse_grouped_marks_info(marks_info)
   }
 end
 
+local function set_cursor_for_popup_win(target_line, mark_char)
+  local line_count = vim.api.nvim_buf_line_count(blackboard_state.popup_buf)
+  if target_line >= line_count then
+    target_line = line_count
+  end
+  vim.api.nvim_win_set_cursor(blackboard_state.popup_win, { target_line, 2 }) -- Move cursor after the arrow
+
+  vim.fn.sign_define('MySign', { text = mark_char, texthl = 'DiagnosticInfo' })
+  vim.fn.sign_place(0, 'MySignGroup', 'MySign', blackboard_state.popup_buf, { lnum = target_line, priority = 100 })
+end
+
+---@param marks_info blackboard.MarkInfo[]
+local function show_fullscreen_popup_at_mark(marks_info)
+  local mark_char = Get_mark_char(blackboard_state)
+  if not mark_char then
+    return
+  elseif blackboard_state.current_mark == mark_char and vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
+    return
+  end
+  blackboard_state.current_mark = mark_char
+
+  local mark_info = Retrieve_mark_info(marks_info, mark_char)
+  local target_line = mark_info.line
+
+  local file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
+  assert(file_content_lines, string.format('File content not found for %s', mark_info.filepath))
+
+  if not vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
+    blackboard_state.popup_buf = vim.api.nvim_create_buf(false, true)
+    Open_popup_win(blackboard_state, mark_info)
+  end
+  file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
+  vim.api.nvim_buf_set_lines(blackboard_state.popup_buf, 0, -1, false, file_content_lines)
+  set_cursor_for_popup_win(target_line, mark_char)
+end
+
+---@param marks_info blackboard.MarkInfo[]
+local function attach_autocmd_blackboard_buf(marks_info)
+  local augroup = vim.api.nvim_create_augroup('blackboard_group', { clear = true })
+  vim.api.nvim_create_autocmd('CursorMoved', {
+    buffer = blackboard_state.blackboard_buf,
+    group = augroup,
+    callback = function()
+      show_fullscreen_popup_at_mark(marks_info)
+      vim.api.nvim_set_current_win(blackboard_state.blackboard_win)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({ 'BufLeave', 'WinLeave' }, {
+    buffer = blackboard_state.blackboard_buf,
+    group = augroup,
+    callback = function()
+      if vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
+        vim.api.nvim_win_close(blackboard_state.popup_win, true)
+      end
+    end,
+  })
+
+  vim.api.nvim_create_autocmd('BufWinLeave', {
+    buffer = blackboard_state.blackboard_buf,
+    group = augroup,
+    callback = function()
+      if vim.api.nvim_get_current_win() == blackboard_state.blackboard_win then
+        vim.api.nvim_win_set_buf(blackboard_state.original_win, blackboard_state.original_buf)
+        vim.defer_fn(function()
+          if not vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
+            return
+          end
+          vim.api.nvim_set_current_win(blackboard_state.original_win)
+          vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
+        end, 0)
+      end
+    end,
+  })
+  local bb = require 'blackboard'
+  vim.keymap.set('n', '<CR>', function()
+    bb.jump_to_mark()
+  end, { noremap = true, silent = true, buffer = blackboard_state.blackboard_buf })
+end
+
 local function add_highlights(parsedMarks)
   local blackboardLines = parsedMarks.blackboardLines
   vim.api.nvim_set_hl(0, 'FileHighlight', { fg = '#5097A4' })
@@ -222,7 +302,7 @@ M.toggle_mark_window = function()
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
   load_all_file_contents(options)
-  Attach_autocmd_blackboard_buf(blackboard_state, marks_info)
+  attach_autocmd_blackboard_buf(marks_info)
 end
 
 M.toggle_mark_context = function()
@@ -237,7 +317,7 @@ M.toggle_mark_context = function()
   local marks_info = Get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
-  Attach_autocmd_blackboard_buf(blackboard_state, marks_info)
+  attach_autocmd_blackboard_buf(marks_info)
 end
 
 M.jump_to_mark = function()
