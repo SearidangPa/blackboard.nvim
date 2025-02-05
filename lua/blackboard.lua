@@ -233,6 +233,7 @@ local function add_virtual_lines(parsedMarks)
     local filename = data.filename or ''
     local funcLine = make_func_line(data)
     local extmarkLine = lineNum - 1
+    print('extmarkLine: ' .. extmarkLine)
 
     local virt_lines
     if extmarkLine == 1 then
@@ -286,7 +287,7 @@ local function create_new_blackboard(marks_info)
 
   vim.api.nvim_win_set_width(blackboard_state.blackboard_win, math.floor(vim.o.columns / 4))
   vim.wo[blackboard_state.blackboard_win].number = true
-  vim.wo[blackboard_state.blackboard_win].relativenumber = false
+  vim.wo[blackboard_state.blackboard_win].relativenumber = true
   vim.wo[blackboard_state.blackboard_win].wrap = false
 end
 
