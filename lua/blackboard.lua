@@ -233,7 +233,6 @@ local function add_virtual_lines(parsedMarks)
     local filename = data.filename or ''
     local funcLine = make_func_line(data)
     local extmarkLine = lineNum - 1
-    print('extmarkLine: ' .. extmarkLine)
 
     local virt_lines
     if extmarkLine == 1 then
