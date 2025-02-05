@@ -285,8 +285,7 @@ local function create_new_blackboard(marks_info)
   vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
 
   vim.api.nvim_win_set_width(blackboard_state.blackboard_win, math.floor(vim.o.columns / 4))
-  vim.wo[blackboard_state.blackboard_win].number = true
-  vim.wo[blackboard_state.blackboard_win].relativenumber = true
+  vim.wo[blackboard_state.blackboard_win].number = false
   vim.wo[blackboard_state.blackboard_win].wrap = false
 end
 
