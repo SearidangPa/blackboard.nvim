@@ -1,3 +1,20 @@
+---@class blackboard.State
+---@field blackboard_win number
+---@field blackboard_buf number
+---@field popup_win number
+---@field popup_buf number
+---@field current_mark string
+---@field original_win number
+---@field original_buf number
+---@field filepath_to_content_lines table<string, string[]>
+---@field mark_to_line table<string, number>
+---@field show_nearest_func boolean
+---
+---@class blackboard.Options
+---@field show_nearest_func boolean
+---@field not_under_func_symbol string
+---@field under_func_symbol string
+
 ---@class blackboard.MarkInfo
 ---@field mark string
 ---@field bufnr number
