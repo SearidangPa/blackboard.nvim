@@ -340,29 +340,4 @@ vim.api.nvim_create_user_command('BlackboardToggleContext', M.toggle_mark_contex
   desc = 'Toggle Mark Context',
 })
 
-M.preview_mark = function(mark)
-  if not vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
-    print 'Blackboard is empty'
-    return
-  end
-
-  local line = blackboard_state.mark_to_line[mark]
-  if not line then
-    print('Mark not found on blackboard: ' .. mark)
-    return
-  end
-
-  vim.api.nvim_set_current_win(blackboard_state.blackboard_win)
-  vim.api.nvim_win_set_cursor(blackboard_state.blackboard_win, { line, 0 })
-end
-
-vim.api.nvim_create_user_command('BlackboardPreviewMark', function(opts)
-  local mark = opts.fargs[1]
-  if not mark then
-    print 'No mark provided'
-    return
-  end
-  M.preview_mark(mark)
-end, { nargs = '*' })
-
 return M

@@ -1,0 +1,10 @@
+---@class blackboard.MarkInfo
+---@field mark string
+---@field bufnr number
+---@field filename string
+---@field filepath string
+---@field filetype string
+---@field line number
+---@field col number
+---@field nearest_func string
+---@field text string
