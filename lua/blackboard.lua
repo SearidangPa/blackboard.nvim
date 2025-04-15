@@ -269,6 +269,14 @@ local function create_new_blackboard(marks_info)
     vim.bo[blackboard_state.blackboard_buf].filetype = filetype
   end
 
+  local map_opts = { buffer = blackboard_state.blackboard_buf, noremap = true, silent = true }
+  vim.keymap.set('n', 'q', function()
+    if vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
+      vim.api.nvim_win_close(blackboard_state.blackboard_win, true)
+      blackboard_state.blackboard_win = -1
+    end
+  end, map_opts)
+
   local util_mark_info = require 'util_blackboard_mark_info'
 
   local local_marks_info = marks_info or util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
