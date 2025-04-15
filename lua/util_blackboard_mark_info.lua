@@ -56,7 +56,8 @@ function util_mark_info.Get_mark_char(blackboard_state)
   local mark_char = line_text:match '([A-Z]):' or line_text:match '([a-z]):'
   return mark_char
 end
----@return string|nil
+
+---@return string?
 function util_mark_info.nearest_function_at_line(bufnr, line)
   local lang = vim.treesitter.language.get_lang(vim.bo[bufnr].filetype) -- Get language from filetype
   local parser = vim.treesitter.get_parser(bufnr, lang)
