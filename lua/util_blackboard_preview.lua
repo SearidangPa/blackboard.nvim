@@ -1,6 +1,8 @@
+local util_blackboard_preview = {}
+
 ---@param blackboard_state blackboard.State
 ---@param mark_info blackboard.MarkInfo
-function Open_popup_win(blackboard_state, mark_info)
+function util_blackboard_preview.Open_popup_win(blackboard_state, mark_info)
   local filetype = mark_info.filetype
   local lang = vim.treesitter.language.get_lang(filetype)
   if not pcall(vim.treesitter.start, blackboard_state.popup_buf, lang) then
@@ -33,3 +35,5 @@ function Open_popup_win(blackboard_state, mark_info)
   vim.wo[blackboard_state.popup_win].relativenumber = true
   vim.api.nvim_set_option_value('winhl', 'Normal:Normal', { win = blackboard_state.popup_win }) -- Match background
 end
+
+return util_blackboard_preview

@@ -1,5 +1,4 @@
 local M = {}
-require 'util_blackboard_preview'
 
 ---@type blackboard.State
 local blackboard_state = {
@@ -118,7 +117,8 @@ local function show_fullscreen_popup_at_mark(marks_info)
 
   if not vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
     blackboard_state.popup_buf = vim.api.nvim_create_buf(false, true)
-    Open_popup_win(blackboard_state, mark_info)
+    local util_blackboard_preview = require 'util_blackboard_preview'
+    util_blackboard_preview.Open_popup_win(blackboard_state, mark_info)
   end
   file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
   vim.api.nvim_buf_set_lines(blackboard_state.popup_buf, 0, -1, false, file_content_lines)

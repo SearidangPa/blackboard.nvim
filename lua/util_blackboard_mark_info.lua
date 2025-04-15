@@ -162,3 +162,5 @@ function util_mark_info.add_global_mark_info(marks_info, char, cwd, show_nearest
     util_mark_info.add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
   end
 end
+
+return util_mark_info
