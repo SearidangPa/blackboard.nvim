@@ -30,8 +30,8 @@ end
 
 local function load_all_file_contents(show_nearest_func)
   local util_mark_info = require 'util_blackboard_mark_info'
-  local all_accessible_marks = util_mark_info.Get_accessible_marks_info(show_nearest_func)
-  local grouped_marks_by_filepath = util_mark_info.Group_marks_info_by_filepath(all_accessible_marks)
+  local all_accessible_marks = util_mark_info.get_accessible_marks_info(show_nearest_func)
+  local grouped_marks_by_filepath = util_mark_info.group_marks_info_by_filepath(all_accessible_marks)
   local pp = require 'plenary.path'
   for filepath, _ in pairs(grouped_marks_by_filepath) do
     local data = pp:new(filepath):read()
@@ -52,7 +52,7 @@ end
 ---@return blackboard.ParsedMarks
 local function parse_grouped_marks_info(marks_info)
   local util_mark_info = require 'util_blackboard_mark_info'
-  local grouped_marks_by_filename = util_mark_info.Group_marks_info_by_filepath(marks_info)
+  local grouped_marks_by_filename = util_mark_info.group_marks_info_by_filepath(marks_info)
   local blackboardLines = {}
   local virtualLines = {}
 
@@ -109,7 +109,7 @@ local function show_fullscreen_popup_at_mark(marks_info)
   end
   blackboard_state.current_mark = mark_char
 
-  local mark_info = util_mark_info.Retrieve_mark_info(marks_info, mark_char)
+  local mark_info = util_mark_info.retrieve_mark_info(marks_info, mark_char)
   local target_line = mark_info.line
 
   local file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
@@ -118,7 +118,7 @@ local function show_fullscreen_popup_at_mark(marks_info)
   if not vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
     blackboard_state.popup_buf = vim.api.nvim_create_buf(false, true)
     local util_blackboard_preview = require 'util_blackboard_preview'
-    util_blackboard_preview.Open_popup_win(blackboard_state, mark_info)
+    util_blackboard_preview.open_popup_win(blackboard_state, mark_info)
   end
   file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
   vim.api.nvim_buf_set_lines(blackboard_state.popup_buf, 0, -1, false, file_content_lines)
@@ -252,6 +252,7 @@ local function add_virtual_lines(parsedMarks)
     last_seen_func = funcLine
   end
 end
+
 ---@param marks_info blackboard.MarkInfo[]
 local function create_new_blackboard(marks_info)
   vim.cmd 'vsplit'
@@ -270,7 +271,7 @@ local function create_new_blackboard(marks_info)
 
   local util_mark_info = require 'util_blackboard_mark_info'
 
-  local local_marks_info = marks_info or util_mark_info.Get_accessible_marks_info(blackboard_state.show_nearest_func)
+  local local_marks_info = marks_info or util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   local parsed_marks_info = parse_grouped_marks_info(local_marks_info)
   vim.api.nvim_buf_set_lines(blackboard_state.blackboard_buf, 0, -1, false, parsed_marks_info.blackboardLines)
   add_highlights(parsed_marks_info)
@@ -282,6 +283,8 @@ local function create_new_blackboard(marks_info)
   vim.wo[blackboard_state.blackboard_win].wrap = false
   vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
 end
+
+--- === Exported functions ===
 
 M.toggle_mark_window = function()
   blackboard_state.original_win = vim.api.nvim_get_current_win()
@@ -296,7 +299,7 @@ M.toggle_mark_window = function()
   end
 
   local util_mark_info = require 'util_blackboard_mark_info'
-  local marks_info = util_mark_info.Get_accessible_marks_info(blackboard_state.show_nearest_func)
+  local marks_info = util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
   load_all_file_contents(blackboard_state.show_nearest_func)
@@ -314,19 +317,10 @@ M.toggle_mark_context = function()
   blackboard_state.show_nearest_func = not blackboard_state.show_nearest_func
 
   local util_mark_info = require 'util_blackboard_mark_info'
-  local marks_info = util_mark_info.Get_accessible_marks_info(blackboard_state.show_nearest_func)
+  local marks_info = util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
   attach_autocmd_blackboard_buf(marks_info)
-end
-
-M.jump_to_mark = function()
-  local util_mark_info = require 'util_blackboard_mark_info'
-  local mark_char = util_mark_info.Get_mark_char(blackboard_state)
-  assert(vim.api.nvim_win_is_valid(blackboard_state.original_win), 'Invalid original window')
-  vim.api.nvim_set_current_win(blackboard_state.original_win)
-  vim.cmd('normal! `' .. mark_char)
-  vim.cmd 'normal! zz'
 end
 
 vim.api.nvim_create_user_command('BlackboardToggle', M.toggle_mark_window, {
