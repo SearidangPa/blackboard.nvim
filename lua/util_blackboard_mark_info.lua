@@ -57,6 +57,8 @@ function util_mark_info.get_mark_char(blackboard_state)
   return mark_char
 end
 
+--- === Private functions ===
+
 ---@return string?
 function util_mark_info._nearest_function_at_line(bufnr, line)
   local lang = vim.treesitter.language.get_lang(vim.bo[bufnr].filetype) -- Get language from filetype
