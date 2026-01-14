@@ -1,8 +1,6 @@
 ---@class blackboard.State
 ---@field blackboard_win number
 ---@field blackboard_buf number
----@field popup_win number
----@field popup_buf number
 ---@field current_mark string
 ---@field original_win number
 ---@field original_buf number

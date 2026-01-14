@@ -4,8 +4,6 @@ local M = {}
 local blackboard_state = {
   blackboard_win = -1,
   blackboard_buf = -1,
-  popup_win = -1,
-  popup_buf = -1,
   current_mark = '',
   original_win = -1,
   original_buf = -1,
@@ -27,7 +25,6 @@ M.setup = function(opts)
   options = vim.tbl_deep_extend('force', options, opts or {})
   blackboard_state.show_nearest_func = options.show_nearest_func
 end
-
 
 ---@class blackboard.ParsedMarks
 ---@field blackboardLines string[]
@@ -62,11 +59,9 @@ local function parse_grouped_marks_info(marks_info)
         func_name = mark_info.nearest_func,
       }
       if mark_info.nearest_func then
-        table.insert(blackboardLines,
-          string.format('%s %s: %s', options.under_func_symbol, mark_info.mark, mark_info.text))
+        table.insert(blackboardLines, string.format('%s %s: %s', options.under_func_symbol, mark_info.mark, mark_info.text))
       else
-        table.insert(blackboardLines,
-          string.format('%s %s: %s', options.not_under_func_symbol, mark_info.mark, mark_info.text))
+        table.insert(blackboardLines, string.format('%s %s: %s', options.not_under_func_symbol, mark_info.mark, mark_info.text))
       end
       blackboard_state.mark_to_line[mark_info.mark] = currentLine
     end
@@ -76,15 +71,6 @@ local function parse_grouped_marks_info(marks_info)
     blackboardLines = blackboardLines,
     virtualLines = virtualLines,
   }
-end
-
----@param marks_info blackboard.MarkInfo[]
-local function attach_autocmd_blackboard_buf(marks_info)
-  local augroup = vim.api.nvim_create_augroup('blackboard_group', { clear = true })
-  local bb = require 'blackboard.init'
-  vim.keymap.set('n', '<CR>', function()
-    bb.jump_to_mark()
-  end, { noremap = true, silent = true, buffer = blackboard_state.blackboard_buf })
 end
 
 local function add_highlights(parsedMarks)
@@ -100,8 +86,7 @@ local function add_highlights(parsedMarks)
       local endCol = line:find(markMatch .. ':')
       if endCol then
         ---@diagnostic disable-next-line: deprecated
-        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1,
-          endCol)
+        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1, endCol)
       end
     end
   end
@@ -156,8 +141,7 @@ local function add_virtual_lines(parsedMarks)
         virt_lines = { { { funcLine, '@function' } } }
       end
     elseif extmarkLine > 1 then
-      virt_lines = get_virtual_lines(filename, funcLine, last_seen_filename, last_seen_func,
-        blackboard_state.show_nearest_func)
+      virt_lines = get_virtual_lines(filename, funcLine, last_seen_filename, last_seen_func, blackboard_state.show_nearest_func)
     end
 
     if virt_lines then
@@ -213,6 +197,7 @@ local function create_new_blackboard(marks_info)
     row = 1,
     style = 'minimal',
     border = 'rounded',
+    focusable = false,
   }
 
   blackboard_state.blackboard_win = vim.api.nvim_open_win(blackboard_state.blackboard_buf, false, opts)
@@ -221,14 +206,6 @@ local function create_new_blackboard(marks_info)
   vim.wo[blackboard_state.blackboard_win].relativenumber = false
   vim.wo[blackboard_state.blackboard_win].wrap = false
   vim.wo[blackboard_state.blackboard_win].winblend = 15
-
-  local map_opts = { buffer = blackboard_state.blackboard_buf, noremap = true, silent = true }
-  vim.keymap.set('n', 'q', function()
-    if vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
-      vim.api.nvim_win_close(blackboard_state.blackboard_win, true)
-      blackboard_state.blackboard_win = -1
-    end
-  end, map_opts)
 end
 
 --- === Exported functions ===
@@ -240,7 +217,6 @@ M.toggle_mark_window = function()
   if vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
     vim.api.nvim_win_hide(blackboard_state.blackboard_win)
     vim.api.nvim_buf_delete(blackboard_state.blackboard_buf, { force = true })
-    vim.api.nvim_del_augroup_by_name 'blackboard_group'
     blackboard_state.filepath_to_content_lines = {}
     return
   end
@@ -249,7 +225,6 @@ M.toggle_mark_window = function()
   local marks_info = util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
-  attach_autocmd_blackboard_buf(marks_info)
 end
 
 M.toggle_mark_context = function()
@@ -258,7 +233,6 @@ M.toggle_mark_context = function()
   else
     vim.api.nvim_win_hide(blackboard_state.blackboard_win)
     vim.api.nvim_buf_delete(blackboard_state.blackboard_buf, { force = true })
-    vim.api.nvim_del_augroup_by_name 'blackboard_group'
   end
   blackboard_state.show_nearest_func = not blackboard_state.show_nearest_func
 
@@ -266,7 +240,6 @@ M.toggle_mark_context = function()
   local marks_info = util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
-  attach_autocmd_blackboard_buf(marks_info)
 end
 
 vim.api.nvim_create_user_command('BlackboardToggle', M.toggle_mark_window, {
