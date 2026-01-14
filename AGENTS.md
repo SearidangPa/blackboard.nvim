@@ -1,5 +1,3 @@
-# AGENTS.md (blackboard.nvim)
-
 This repository is a small Neovim plugin written in Lua.
 Primary goals for agents: keep startup fast, follow Stylua formatting, and use LuaLS annotations consistently.
 
