@@ -1,3 +1,5 @@
+---@meta
+
 ---@class blackboard.State
 ---@field blackboard_win number
 ---@field blackboard_buf number
@@ -6,7 +8,7 @@
 ---@field original_buf number
 ---@field filepath_to_content_lines table<string, string[]>
 ---@field mark_to_line table<string, number>
----
+
 ---@class blackboard.Options
 ---@field not_under_func_symbol string
 ---@field under_func_symbol string

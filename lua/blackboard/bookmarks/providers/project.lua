@@ -181,7 +181,7 @@ local function resolve_mark_position(bufnr, mark)
   local func_name = ''
 
   if mark.ratio and mark.func_start_row then
-    local util_ts = require 'blackboard.util_blackboard_mark_info'
+    local util_ts = require 'blackboard.bookmarks.analysis'
     local ctx = util_ts.find_function_by_position(bufnr, mark.func_start_row)
     if ctx and ctx.start_row and ctx.end_row then
       local span = ctx.end_row - ctx.start_row
@@ -224,7 +224,7 @@ M.set_mark = function(mark)
   local row1, col0 = unpack(vim.api.nvim_win_get_cursor(0))
   local line_text = get_line_text(bufnr, row1)
 
-  local util_ts = require 'blackboard.util_blackboard_mark_info'
+  local util_ts = require 'blackboard.bookmarks.analysis'
   local func_ctx = util_ts.enclosing_function_context(bufnr, row1 - 1, col0)
 
   local record = {

@@ -1,4 +1,4 @@
-local util_mark_info = {}
+local M = {}
 
 ---@class blackboard.FunctionContext
 ---@field func_name string
@@ -64,7 +64,7 @@ end
 ---@param row0 number
 ---@param col0 number
 ---@return blackboard.FunctionContext?
-function util_mark_info.enclosing_function_context(bufnr, row0, col0)
+function M.enclosing_function_context(bufnr, row0, col0)
   local parser = get_parser(bufnr)
   if not parser then
     return nil
@@ -133,7 +133,7 @@ end
 ---@param bufnr number
 ---@param approx_start_row number
 ---@return blackboard.FunctionContext?
-function util_mark_info.find_function_by_position(bufnr, approx_start_row)
+function M.find_function_by_position(bufnr, approx_start_row)
   local parser = get_parser(bufnr)
   if not parser then
     return nil
@@ -173,4 +173,4 @@ function util_mark_info.find_function_by_position(bufnr, approx_start_row)
   return best
 end
 
-return util_mark_info
+return M
