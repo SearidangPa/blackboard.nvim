@@ -28,17 +28,6 @@ M.setup = function(opts)
   blackboard_state.show_nearest_func = options.show_nearest_func
 end
 
-local function load_all_file_contents(show_nearest_func)
-  local util_mark_info = require 'util_blackboard_mark_info'
-  local all_accessible_marks = util_mark_info.get_accessible_marks_info(show_nearest_func)
-  local grouped_marks_by_filepath = util_mark_info.group_marks_info_by_filepath(all_accessible_marks)
-  local pp = require 'plenary.path'
-  for filepath, _ in pairs(grouped_marks_by_filepath) do
-    local data = pp:new(filepath):read()
-    local content_lines = vim.split(data, '\n', { plain = true })
-    blackboard_state.filepath_to_content_lines[filepath] = content_lines
-  end
-end
 
 ---@class blackboard.ParsedMarks
 ---@field blackboardLines string[]
@@ -51,7 +40,7 @@ end
 ---@param marks_info blackboard.MarkInfo[]
 ---@return blackboard.ParsedMarks
 local function parse_grouped_marks_info(marks_info)
-  local util_mark_info = require 'util_blackboard_mark_info'
+  local util_mark_info = require 'blackboard.util_blackboard_mark_info'
   local grouped_marks_by_filename = util_mark_info.group_marks_info_by_filepath(marks_info)
   local blackboardLines = {}
   local virtualLines = {}
@@ -73,9 +62,11 @@ local function parse_grouped_marks_info(marks_info)
         func_name = mark_info.nearest_func,
       }
       if mark_info.nearest_func then
-        table.insert(blackboardLines, string.format('%s %s: %s', options.under_func_symbol, mark_info.mark, mark_info.text))
+        table.insert(blackboardLines,
+          string.format('%s %s: %s', options.under_func_symbol, mark_info.mark, mark_info.text))
       else
-        table.insert(blackboardLines, string.format('%s %s: %s', options.not_under_func_symbol, mark_info.mark, mark_info.text))
+        table.insert(blackboardLines,
+          string.format('%s %s: %s', options.not_under_func_symbol, mark_info.mark, mark_info.text))
       end
       blackboard_state.mark_to_line[mark_info.mark] = currentLine
     end
@@ -87,83 +78,10 @@ local function parse_grouped_marks_info(marks_info)
   }
 end
 
-local function set_cursor_for_popup_win(target_line, mark_char)
-  local line_count = vim.api.nvim_buf_line_count(blackboard_state.popup_buf)
-  if target_line >= line_count then
-    target_line = line_count
-  end
-  vim.api.nvim_win_set_cursor(blackboard_state.popup_win, { target_line, 2 }) -- Move cursor after the arrow
-
-  vim.fn.sign_define('MySign', { text = mark_char, texthl = 'DiagnosticInfo' })
-  vim.fn.sign_place(0, 'MySignGroup', 'MySign', blackboard_state.popup_buf, { lnum = target_line, priority = 100 })
-end
-
----@param marks_info blackboard.MarkInfo[]
-local function show_fullscreen_popup_at_mark(marks_info)
-  local util_mark_info = require 'util_blackboard_mark_info'
-  local mark_char = util_mark_info.get_mark_char(blackboard_state)
-  if not mark_char then
-    return
-  elseif blackboard_state.current_mark == mark_char and vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
-    return
-  end
-  blackboard_state.current_mark = mark_char
-
-  local mark_info = util_mark_info.retrieve_mark_info(marks_info, mark_char)
-  local target_line = mark_info.line
-
-  local file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
-  assert(file_content_lines, string.format('File content not found for %s', mark_info.filepath))
-
-  if not vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
-    blackboard_state.popup_buf = vim.api.nvim_create_buf(false, true)
-    local util_blackboard_preview = require 'util_blackboard_preview'
-    util_blackboard_preview.open_popup_win(blackboard_state, mark_info)
-  end
-  file_content_lines = blackboard_state.filepath_to_content_lines[mark_info.filepath]
-  vim.api.nvim_buf_set_lines(blackboard_state.popup_buf, 0, -1, false, file_content_lines)
-  set_cursor_for_popup_win(target_line, mark_char)
-end
-
 ---@param marks_info blackboard.MarkInfo[]
 local function attach_autocmd_blackboard_buf(marks_info)
   local augroup = vim.api.nvim_create_augroup('blackboard_group', { clear = true })
-  vim.api.nvim_create_autocmd('CursorMoved', {
-    buffer = blackboard_state.blackboard_buf,
-    group = augroup,
-    callback = function()
-      show_fullscreen_popup_at_mark(marks_info)
-      vim.api.nvim_set_current_win(blackboard_state.blackboard_win)
-    end,
-  })
-
-  vim.api.nvim_create_autocmd({ 'BufLeave', 'WinLeave' }, {
-    buffer = blackboard_state.blackboard_buf,
-    group = augroup,
-    callback = function()
-      if vim.api.nvim_win_is_valid(blackboard_state.popup_win) then
-        vim.api.nvim_win_close(blackboard_state.popup_win, true)
-      end
-    end,
-  })
-
-  vim.api.nvim_create_autocmd('BufWinLeave', {
-    buffer = blackboard_state.blackboard_buf,
-    group = augroup,
-    callback = function()
-      if vim.api.nvim_get_current_win() == blackboard_state.blackboard_win then
-        vim.api.nvim_win_set_buf(blackboard_state.original_win, blackboard_state.original_buf)
-        vim.defer_fn(function()
-          if not vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
-            return
-          end
-          vim.api.nvim_set_current_win(blackboard_state.original_win)
-          vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
-        end, 0)
-      end
-    end,
-  })
-  local bb = require 'blackboard'
+  local bb = require 'blackboard.init'
   vim.keymap.set('n', '<CR>', function()
     bb.jump_to_mark()
   end, { noremap = true, silent = true, buffer = blackboard_state.blackboard_buf })
@@ -182,7 +100,8 @@ local function add_highlights(parsedMarks)
       local endCol = line:find(markMatch .. ':')
       if endCol then
         ---@diagnostic disable-next-line: deprecated
-        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1, endCol)
+        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1,
+          endCol)
       end
     end
   end
@@ -237,7 +156,8 @@ local function add_virtual_lines(parsedMarks)
         virt_lines = { { { funcLine, '@function' } } }
       end
     elseif extmarkLine > 1 then
-      virt_lines = get_virtual_lines(filename, funcLine, last_seen_filename, last_seen_func, blackboard_state.show_nearest_func)
+      virt_lines = get_virtual_lines(filename, funcLine, last_seen_filename, last_seen_func,
+        blackboard_state.show_nearest_func)
     end
 
     if virt_lines then
@@ -255,8 +175,6 @@ end
 
 ---@param marks_info blackboard.MarkInfo[]
 local function create_new_blackboard(marks_info)
-  vim.cmd 'vsplit'
-  blackboard_state.blackboard_win = vim.api.nvim_get_current_win()
   local plenary_filetype = require 'plenary.filetype'
   local filetype = plenary_filetype.detect(vim.api.nvim_buf_get_name(0), {})
 
@@ -269,15 +187,7 @@ local function create_new_blackboard(marks_info)
     vim.bo[blackboard_state.blackboard_buf].filetype = filetype
   end
 
-  local map_opts = { buffer = blackboard_state.blackboard_buf, noremap = true, silent = true }
-  vim.keymap.set('n', 'q', function()
-    if vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
-      vim.api.nvim_win_close(blackboard_state.blackboard_win, true)
-      blackboard_state.blackboard_win = -1
-    end
-  end, map_opts)
-
-  local util_mark_info = require 'util_blackboard_mark_info'
+  local util_mark_info = require 'blackboard.util_blackboard_mark_info'
 
   local local_marks_info = marks_info or util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   local parsed_marks_info = parse_grouped_marks_info(local_marks_info)
@@ -285,11 +195,40 @@ local function create_new_blackboard(marks_info)
   add_highlights(parsed_marks_info)
   add_virtual_lines(parsed_marks_info)
 
-  vim.api.nvim_win_set_width(blackboard_state.blackboard_win, math.floor(vim.o.columns / 4))
+  local width = math.floor(vim.o.columns / 4)
+  local height = #parsed_marks_info.blackboardLines
+  if height == 0 then
+    height = 1
+  end
+  local max_height = math.floor(vim.o.lines * 0.8)
+  if height > max_height then
+    height = max_height
+  end
+
+  local opts = {
+    relative = 'editor',
+    width = width,
+    height = height,
+    col = vim.o.columns - width - 1,
+    row = 1,
+    style = 'minimal',
+    border = 'rounded',
+  }
+
+  blackboard_state.blackboard_win = vim.api.nvim_open_win(blackboard_state.blackboard_buf, false, opts)
+
   vim.wo[blackboard_state.blackboard_win].number = false
   vim.wo[blackboard_state.blackboard_win].relativenumber = false
   vim.wo[blackboard_state.blackboard_win].wrap = false
-  vim.api.nvim_win_set_buf(blackboard_state.blackboard_win, blackboard_state.blackboard_buf)
+  vim.wo[blackboard_state.blackboard_win].winblend = 15
+
+  local map_opts = { buffer = blackboard_state.blackboard_buf, noremap = true, silent = true }
+  vim.keymap.set('n', 'q', function()
+    if vim.api.nvim_win_is_valid(blackboard_state.blackboard_win) then
+      vim.api.nvim_win_close(blackboard_state.blackboard_win, true)
+      blackboard_state.blackboard_win = -1
+    end
+  end, map_opts)
 end
 
 --- === Exported functions ===
@@ -306,11 +245,10 @@ M.toggle_mark_window = function()
     return
   end
 
-  local util_mark_info = require 'util_blackboard_mark_info'
+  local util_mark_info = require 'blackboard.util_blackboard_mark_info'
   local marks_info = util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
-  load_all_file_contents(blackboard_state.show_nearest_func)
   attach_autocmd_blackboard_buf(marks_info)
 end
 
@@ -324,7 +262,7 @@ M.toggle_mark_context = function()
   end
   blackboard_state.show_nearest_func = not blackboard_state.show_nearest_func
 
-  local util_mark_info = require 'util_blackboard_mark_info'
+  local util_mark_info = require 'blackboard.util_blackboard_mark_info'
   local marks_info = util_mark_info.get_accessible_marks_info(blackboard_state.show_nearest_func)
   create_new_blackboard(marks_info)
   vim.api.nvim_set_current_win(blackboard_state.original_win)
