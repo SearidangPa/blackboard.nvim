@@ -6,12 +6,17 @@
 ---@field original_buf number
 ---@field filepath_to_content_lines table<string, string[]>
 ---@field mark_to_line table<string, number>
----@field show_nearest_func boolean
 ---
 ---@class blackboard.Options
----@field show_nearest_func boolean
 ---@field not_under_func_symbol string
 ---@field under_func_symbol string
+---@field mark_provider? blackboard.MarkProvider
+
+---@class blackboard.MarkProvider
+---@field list_marks fun(): blackboard.MarkInfo[]
+---@field set_mark fun(mark: string)
+---@field unset_mark fun(mark: string)
+---@field jump_to_mark fun(mark: string)
 
 ---@class blackboard.MarkInfo
 ---@field mark string

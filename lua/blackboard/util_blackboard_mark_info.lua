@@ -1,169 +1,166 @@
 local util_mark_info = {}
 
----@param marks_info blackboard.MarkInfo[]
----@param mark_char string
----@return blackboard.MarkInfo
-function util_mark_info.retrieve_mark_info(marks_info, mark_char)
-  assert(marks_info, 'No marks info provided')
-  assert(mark_char, 'No mark char provided')
-  local mark_info
-  for _, m in ipairs(marks_info) do
-    if m.mark == mark_char then
-      mark_info = m
-      break
+---@class blackboard.FunctionContext
+---@field func_name string
+---@field start_row number 0-based
+---@field end_row number 0-based (exclusive)
+
+local function get_parser(bufnr)
+  local ft = vim.bo[bufnr].filetype
+  if ft == '' then
+    return nil
+  end
+
+  local ok_lang, lang = pcall(vim.treesitter.language.get_lang, ft)
+  if not ok_lang or not lang then
+    return nil
+  end
+
+  local ok_parser, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+  if not ok_parser then
+    return nil
+  end
+
+  return parser
+end
+
+---@param node_type string
+---@return boolean
+local function is_function_node_type(node_type)
+  return node_type == 'function_declaration'
+    or node_type == 'method_declaration'
+    or node_type == 'function_definition'
+    or node_type == 'function_item'
+    or node_type == 'function'
+    or node_type == 'method'
+end
+
+---@param bufnr number
+---@param node any
+---@return string
+local function get_function_name(bufnr, node)
+  for child in node:iter_children() do
+    local t = child:type()
+    if t == 'identifier' or t == 'name' then
+      local ok_text, text = pcall(vim.treesitter.get_node_text, child, bufnr)
+      if ok_text and text and text ~= '' then
+        return text
+      end
     end
   end
-  assert(mark_info, 'No mark info found for mark: ' .. mark_char)
-  assert(mark_info.filepath and mark_info.filepath ~= '', 'No filepath found for mark: ' .. mark_char)
-  return mark_info
+
+  return ''
 end
 
----@param all_accessible_marks blackboard.MarkInfo[]
-function util_mark_info.group_marks_info_by_filepath(all_accessible_marks)
-  local grouped_marks = {}
-  for _, m in ipairs(all_accessible_marks) do
-    local filepath = m.filepath
-    if not grouped_marks[filepath] then
-      grouped_marks[filepath] = {}
+---@param root any
+---@param cb fun(node: any)
+local function walk_nodes(root, cb)
+  cb(root)
+  for child in root:iter_children() do
+    walk_nodes(child, cb)
+  end
+end
+
+---@param bufnr number
+---@param row0 number
+---@param col0 number
+---@return blackboard.FunctionContext?
+function util_mark_info.enclosing_function_context(bufnr, row0, col0)
+  local parser = get_parser(bufnr)
+  if not parser then
+    return nil
+  end
+
+  local ok_node, node = pcall(vim.treesitter.get_node, {
+    bufnr = bufnr,
+    pos = { row0, col0 },
+  })
+
+  if ok_node and node then
+    local cur = node
+    while cur do
+      if is_function_node_type(cur:type()) then
+        local start_row, _, end_row, _ = cur:range()
+        return {
+          func_name = get_function_name(bufnr, cur),
+          start_row = start_row,
+          end_row = end_row,
+        }
+      end
+      cur = cur:parent()
     end
-    table.insert(grouped_marks[filepath], m)
   end
-
-  return grouped_marks
-end
-
----@return blackboard.MarkInfo[]
-function util_mark_info.get_accessible_marks_info(show_nearest_func)
-  local marks_info = {}
-  local cwd = vim.fn.getcwd()
-  for char = string.byte 'A', string.byte 'Z' do
-    util_mark_info._add_global_mark_info(marks_info, char, cwd, show_nearest_func)
-  end
-  util_mark_info._add_local_marks(marks_info, show_nearest_func)
-
-  return marks_info
-end
-
----@param blackboard_state blackboard.State
-function util_mark_info.get_mark_char(blackboard_state)
-  if not vim.api.nvim_buf_is_valid(blackboard_state.blackboard_buf) then
-    vim.notify('blackboard buffer is invalid', vim.log.levels.ERROR)
-    return ''
-  end
-  local line_num = vim.fn.line '.'
-  local line_text = vim.fn.getline(line_num)
-
-  local mark_char = line_text:match '([A-Z]):' or line_text:match '([a-z]):'
-  return mark_char
-end
-
---- === Private functions ===
-
----@return string?
-function util_mark_info._nearest_function_at_line(bufnr, line)
-  local lang = vim.treesitter.language.get_lang(vim.bo[bufnr].filetype) -- Get language from filetype
-  local parser = vim.treesitter.get_parser(bufnr, lang)
-  assert(parser, 'parser is nil')
 
   local tree = parser:parse()[1]
-  assert(tree, 'tree is nil')
+  if not tree then
+    return nil
+  end
 
-  local root = tree:root()
-  assert(root, 'root is nil')
-
-  local function traverse(node)
-    local nearest_function = nil
-    for child in node:iter_children() do
-      if child:type() == 'function_declaration' or child:type() == 'method_declaration' or child:type() == 'function_definition' then
-        local start_row, _, end_row, _ = child:range()
-        if start_row <= line and end_row >= line then
-          for subchild in child:iter_children() do
-            if subchild:type() == 'identifier' or subchild:type() == 'name' then
-              nearest_function = vim.treesitter.get_node_text(subchild, bufnr)
-              break
-            end
-          end
-        end
-      end
-
-      if not nearest_function then
-        nearest_function = traverse(child)
-      end
-      if nearest_function then
-        break
-      end
+  local found
+  walk_nodes(tree:root(), function(n)
+    if found then
+      return
     end
-    return nearest_function
-  end
 
-  return traverse(root)
-end
-
----@param marks_info blackboard.MarkInfo[]
-function util_mark_info._add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
-  local filepath = vim.api.nvim_buf_get_name(bufnr)
-  ---@diagnostic disable-next-line: undefined-field
-  if not vim.uv.fs_stat(filepath) then
-    return
-  end
-
-  local filetype = require('plenary.filetype').detect_from_extension(filepath)
-  vim.bo[bufnr].filetype = filetype
-
-  local nearest_func = show_nearest_func and util_mark_info._nearest_function_at_line(bufnr, line) or nil
-  local text = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ''
-  local filename = vim.fn.fnamemodify(filepath, ':t')
-  table.insert(marks_info, {
-    mark = mark,
-    bufnr = bufnr,
-    filename = filename,
-    filepath = filepath,
-    filetype = filetype,
-    line = line,
-    col = col,
-    nearest_func = nearest_func,
-    text = vim.trim(text),
-  })
-end
-
----@param marks_info blackboard.MarkInfo[]
-function util_mark_info._add_local_marks(marks_info, show_nearest_func)
-  local mark_list = vim.fn.getmarklist(vim.api.nvim_get_current_buf())
-
-  for _, mark_entry in ipairs(mark_list) do
-    local mark = mark_entry.mark:sub(2, 2)
-    if mark:match '[a-z]' then
-      local bufnr = mark_entry.pos[1]
-      local line = mark_entry.pos[2]
-      local col = mark_entry.pos[3]
-
-      if vim.api.nvim_buf_is_valid(bufnr) then
-        util_mark_info._add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
-      end
+    if not is_function_node_type(n:type()) then
+      return
     end
-  end
+
+    local start_row, _, end_row, _ = n:range()
+    if start_row <= row0 and row0 < end_row then
+      found = {
+        func_name = get_function_name(bufnr, n),
+        start_row = start_row,
+        end_row = end_row,
+      }
+    end
+  end)
+
+  return found
 end
 
----@param marks_info blackboard.MarkInfo[]
-function util_mark_info._add_global_mark_info(marks_info, char, cwd, show_nearest_func)
-  local mark = string.char(char)
-  local pos = vim.fn.getpos("'" .. mark)
-  if pos[1] == 0 then
-    return
+---@param bufnr number
+---@param func_name string
+---@param approx_start_row number
+---@return blackboard.FunctionContext?
+function util_mark_info.find_function_by_name(bufnr, func_name, approx_start_row)
+  local parser = get_parser(bufnr)
+  if not parser then
+    return nil
   end
-  local bufnr = pos[1]
-  local line = pos[2]
-  local col = pos[3]
 
-  local filepath = vim.fn.bufname(bufnr)
-  local abs_filepath = vim.fn.fnamemodify(filepath, ':p')
+  local tree = parser:parse()[1]
+  if not tree then
+    return nil
+  end
 
-  if not abs_filepath:find(cwd, 1, true) then
-    return
-  end
-  if vim.api.nvim_buf_is_valid(bufnr) then
-    util_mark_info._add_mark_info(marks_info, mark, bufnr, line, col, show_nearest_func)
-  end
+  local best
+  local best_score
+
+  walk_nodes(tree:root(), function(n)
+    if not is_function_node_type(n:type()) then
+      return
+    end
+
+    local name = get_function_name(bufnr, n)
+    if name ~= func_name then
+      return
+    end
+
+    local start_row, _, end_row, _ = n:range()
+    local score = math.abs(start_row - approx_start_row)
+
+    if not best_score or score < best_score then
+      best_score = score
+      best = {
+        func_name = name,
+        start_row = start_row,
+        end_row = end_row,
+      }
+    end
+  end)
+
+  return best
 end
 
 return util_mark_info
