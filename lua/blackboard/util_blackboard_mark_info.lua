@@ -11,17 +11,8 @@ local function get_parser(bufnr)
     return nil
   end
 
-  local ok_lang, lang = pcall(vim.treesitter.language.get_lang, ft)
-  if not ok_lang or not lang then
-    return nil
-  end
-
-  local ok_parser, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
-  if not ok_parser then
-    return nil
-  end
-
-  return parser
+  local lang = vim.treesitter.language.get_lang(ft)
+  return vim.treesitter.get_parser(bufnr, lang)
 end
 
 ---@param node_type string
@@ -39,11 +30,19 @@ end
 ---@param node any
 ---@return string
 local function get_function_name(bufnr, node)
+  local name_fields = node:field 'name'
+  if name_fields and name_fields[1] then
+    local text = vim.treesitter.get_node_text(name_fields[1], bufnr)
+    if text and text ~= '' then
+      return text
+    end
+  end
+
   for child in node:iter_children() do
     local t = child:type()
-    if t == 'identifier' or t == 'name' then
-      local ok_text, text = pcall(vim.treesitter.get_node_text, child, bufnr)
-      if ok_text and text and text ~= '' then
+    if t == 'identifier' or t == 'name' or t == 'field_identifier' or t == 'property_identifier' then
+      local text = vim.treesitter.get_node_text(child, bufnr)
+      if text and text ~= '' then
         return text
       end
     end
@@ -71,21 +70,24 @@ function util_mark_info.enclosing_function_context(bufnr, row0, col0)
     return nil
   end
 
-  local ok_node, node = pcall(vim.treesitter.get_node, {
+  local node = vim.treesitter.get_node {
     bufnr = bufnr,
     pos = { row0, col0 },
-  })
+  }
 
-  if ok_node and node then
+  if node then
     local cur = node
     while cur do
       if is_function_node_type(cur:type()) then
-        local start_row, _, end_row, _ = cur:range()
-        return {
-          func_name = get_function_name(bufnr, cur),
-          start_row = start_row,
-          end_row = end_row,
-        }
+        local name = get_function_name(bufnr, cur)
+        if name ~= '' then
+          local start_row, _, end_row, _ = cur:range()
+          return {
+            func_name = name,
+            start_row = start_row,
+            end_row = end_row,
+          }
+        end
       end
       cur = cur:parent()
     end
@@ -96,27 +98,36 @@ function util_mark_info.enclosing_function_context(bufnr, row0, col0)
     return nil
   end
 
-  local found
-  walk_nodes(tree:root(), function(n)
-    if found then
-      return
-    end
+  local best
+  local best_span
 
+  walk_nodes(tree:root(), function(n)
     if not is_function_node_type(n:type()) then
       return
     end
 
     local start_row, _, end_row, _ = n:range()
-    if start_row <= row0 and row0 < end_row then
-      found = {
-        func_name = get_function_name(bufnr, n),
+    if not (start_row <= row0 and row0 < end_row) then
+      return
+    end
+
+    local name = get_function_name(bufnr, n)
+    if name == '' then
+      return
+    end
+
+    local span = end_row - start_row
+    if not best_span or span < best_span then
+      best_span = span
+      best = {
+        func_name = name,
         start_row = start_row,
         end_row = end_row,
       }
     end
   end)
 
-  return found
+  return best
 end
 
 ---@param bufnr number
@@ -143,7 +154,7 @@ function util_mark_info.find_function_by_name(bufnr, func_name, approx_start_row
     end
 
     local name = get_function_name(bufnr, n)
-    if name ~= func_name then
+    if name == '' or name ~= func_name then
       return
     end
 
