@@ -73,11 +73,13 @@ local function parse_marks_info(marks_info)
     virtualLines[currentLine] = nearest_func
 
     local symbol = options.not_under_func_symbol
+    local func_prefix = ''
     if nearest_func ~= '' then
       symbol = options.under_func_symbol
+      func_prefix = '(' .. nearest_func .. ') '
     end
 
-    table.insert(blackboardLines, string.format('%s %s: %s', symbol, mark_info.mark, mark_info.text))
+    table.insert(blackboardLines, string.format('%s %s: %s%s', symbol, mark_info.mark, func_prefix, mark_info.text))
     blackboard_state.mark_to_line[mark_info.mark] = currentLine
   end
 
@@ -109,6 +111,8 @@ local function add_virtual_lines(parsedMarks)
   local ns_blackboard = vim.api.nvim_create_namespace 'blackboard_extmarks'
   vim.api.nvim_buf_clear_namespace(blackboard_state.blackboard_buf, ns_blackboard, 0, -1)
 
+  vim.api.nvim_set_hl(0, 'BlackboardFunctionHeader', { link = 'Function' })
+
   local last_seen_func = nil
 
   for line_num, func_name in ipairs(parsedMarks.virtualLines) do
@@ -117,7 +121,7 @@ local function add_virtual_lines(parsedMarks)
 
     if func_line ~= last_seen_func then
       vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, ns_blackboard, extmark_line, 0, {
-        virt_lines = { { { func_line, '@function' } } },
+        virt_lines = { { { func_line, 'BlackboardFunctionHeader' } } },
         virt_lines_above = true,
         hl_mode = 'combine',
         priority = 10,
