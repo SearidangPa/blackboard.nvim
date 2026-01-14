@@ -38,12 +38,18 @@ end
 ---@return blackboard.ParsedMarks
 local function parse_grouped_marks_info(marks_info)
   local util_mark_info = require 'blackboard.util_blackboard_mark_info'
+  local util_truncate = require 'blackboard.util_truncate'
   local grouped_marks_by_filename = util_mark_info.group_marks_info_by_filepath(marks_info)
   local blackboardLines = {}
   local virtualLines = {}
 
   for filepath, grouped_marks_info in pairs(grouped_marks_by_filename) do
-    local filename = vim.fn.fnamemodify(filepath, ':t')
+    local relative_path = vim.fn.fnamemodify(filepath, ':.')
+    local filename = util_truncate.truncate_middle(relative_path, {
+      pattern = '[^/]+',
+      joiner = '/',
+      part_len = 10,
+    })
     table.sort(grouped_marks_info, function(a, b)
       return a.line < b.line
     end)
