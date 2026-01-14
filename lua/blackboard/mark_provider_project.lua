@@ -4,7 +4,6 @@ local M = {}
 ---@field filepath string Project-relative path
 ---@field fallback_line number 1-based
 ---@field col number 0-based
----@field func_name? string
 ---@field func_start_row? number 0-based, from TS range
 ---@field func_end_row? number 0-based, from TS range (exclusive)
 ---@field ratio? number 0..1, relative within function
@@ -179,17 +178,17 @@ end
 local function resolve_mark_position(bufnr, mark)
   local row1 = mark.fallback_line
   local col0 = mark.col
-  local func_name = mark.func_name or ''
+  local func_name = ''
 
-  if func_name ~= '' and mark.ratio and mark.func_start_row and mark.func_end_row then
+  if mark.ratio and mark.func_start_row then
     local util_ts = require 'blackboard.util_blackboard_mark_info'
-    local ctx = util_ts.find_function_by_name(bufnr, func_name, mark.func_start_row)
+    local ctx = util_ts.find_function_by_position(bufnr, mark.func_start_row)
     if ctx and ctx.start_row and ctx.end_row then
       local span = ctx.end_row - ctx.start_row
       local row0 = ctx.start_row + math.floor((mark.ratio * span) + 0.5)
       row0 = math.min(math.max(row0, ctx.start_row), ctx.end_row - 1)
       row1 = row0 + 1
-      func_name = ctx.func_name or func_name
+      func_name = ctx.func_name or ''
     end
   end
 
@@ -232,7 +231,6 @@ M.set_mark = function(mark)
     filepath = relpath,
     fallback_line = row1,
     col = col0,
-    func_name = func_ctx and func_ctx.func_name or nil,
     func_start_row = func_ctx and func_ctx.start_row or nil,
     func_end_row = func_ctx and func_ctx.end_row or nil,
     ratio = func_ctx and ratio_in_range(row1 - 1, func_ctx.start_row, func_ctx.end_row) or nil,
@@ -287,7 +285,7 @@ M.list_marks = function()
 
     local row1 = record.fallback_line
     local col0 = record.col
-    local func_name = record.func_name or ''
+    local func_name = ''
     local text = ''
 
     if bufnr then
@@ -355,7 +353,7 @@ M.jump_to_mark = function(mark)
   ensure_filetype(bufnr)
 
   local row1, col0 = record.fallback_line, record.col
-  if record.func_name and record.func_name ~= '' then
+  if record.func_start_row then
     row1, col0 = resolve_mark_position(bufnr, record)
   end
 
