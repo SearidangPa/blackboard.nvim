@@ -17,7 +17,8 @@ M.setup = function(opts)
     or type(project_provider.unset_mark) ~= 'function'
     or type(project_provider.jump_to_mark) ~= 'function'
   then
-    vim.notify('blackboard: project mark provider must implement list_marks/set_mark/unset_mark/jump_to_mark', vim.log.levels.ERROR)
+    local message = 'blackboard: project mark provider must implement list_marks/set_mark/unset_mark/jump_to_mark'
+    vim.notify(message, vim.log.levels.ERROR)
   end
 
   -- Setup keybindings

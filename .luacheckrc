@@ -1,4 +1,4 @@
-max_line_length = 160
+max_line_length = 120
 globals = {
   "vim",
   "Snacks",

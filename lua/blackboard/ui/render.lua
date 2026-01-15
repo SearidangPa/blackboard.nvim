@@ -171,8 +171,6 @@ end
 ---@field functionNames table<number, string>
 ---@field lineTextMeta table<number, blackboard.LineTextMeta>
 
-local function truncate_function_name(name) end
-
 ---@param str string
 ---@param max_len number
 ---@return string
@@ -223,7 +221,7 @@ function M.parse_marks_info(marks_info)
       functionNames[currentLine] = display_text
     else
       display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
-      -- "a " prefix is 2 characters
+      -- a prefix is 2 characters
       lineTextMeta[currentLine] = {
         bufnr = mark_info.bufnr,
         line = mark_info.line,
@@ -317,7 +315,10 @@ function M.add_highlights(parsedMarks)
   for lineIdx, line in ipairs(blackboardLines) do
     local markMatch = line:match '^([A-Za-z]) '
     if markMatch then
-      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, 0, { end_col = 1, hl_group = 'MarkHighlight' })
+      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, 0, {
+        end_col = 1,
+        hl_group = 'MarkHighlight',
+      })
     end
 
     local func_name = functionNames and functionNames[lineIdx]

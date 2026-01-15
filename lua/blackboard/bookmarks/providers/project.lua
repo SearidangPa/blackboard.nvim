@@ -292,7 +292,7 @@ M.list_marks = function()
     local row1 = record.fallback_line
     local col0 = record.col
     local func_name = ''
-    local text = ''
+    local text
 
     if bufnr then
       row1, col0, func_name = resolve_mark_position(bufnr, record)
