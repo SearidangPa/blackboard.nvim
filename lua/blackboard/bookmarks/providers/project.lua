@@ -311,6 +311,7 @@ M.list_marks = function()
       col = col0,
       nearest_func = func_name,
       text = string.format('%s:%d %s', record.filepath, row1, text),
+      line_text = text,
     }
   end
 

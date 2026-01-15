@@ -22,3 +22,4 @@
 ---@field col number
 ---@field nearest_func string
 ---@field text string
+---@field line_text string

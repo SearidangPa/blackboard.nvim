@@ -5,11 +5,11 @@ local M = {}
 -- === Truncation Logic ===
 
 local default_truncate_opts = {
-  empty_fallback_len = 8,
+  empty_fallback_len = 12,
   joiner = '_',
   pattern = '[^%s_%-%+%.]+',
   camelcase = false,
-  truncate_marker = '…',
+  truncate_marker = '-',
 }
 
 local function split_on_pattern(str, pattern)
@@ -133,7 +133,7 @@ function M.truncate_middle(str, opts)
     return str:sub(1, opts.empty_fallback_len)
   end
 
-  if #parts <= 3 then
+  if #parts <= 4 then
     for i, p in ipairs(parts) do
       parts[i] = p:sub(1, opts.part_len)
     end
@@ -141,32 +141,46 @@ function M.truncate_middle(str, opts)
   end
 
   local first = parts[1]:sub(1, opts.part_len)
+  local second = parts[2]:sub(1, opts.part_len)
   local second_last = parts[#parts - 1]:sub(1, opts.part_len)
   local last = parts[#parts]:sub(1, opts.part_len)
-  return table.concat({ first, opts.truncate_marker, second_last, last }, opts.joiner)
+  return table.concat({ first, second, opts.truncate_marker, second_last, last }, opts.joiner)
 end
 
 -- === Rendering Logic ===
 
+---@class blackboard.LineTextMeta
+---@field bufnr number
+---@field line number
+---@field filetype string
+---@field text string
+---@field text_col number Column where line text starts in rendered line
+
 ---@class blackboard.ParsedMarks
 ---@field blackboardLines string[]
----@field functionNames string[]
+---@field functionNames table<number, string>
+---@field lineTextMeta table<number, blackboard.LineTextMeta>
 
 local function truncate_function_name(name)
   local joiner = name:match '[%s_%-%+%.]' and '_' or ''
   return M.truncate_middle(name, {
     joiner = joiner,
     camelcase = true,
+    part_len = 3,
   })
 end
 
-local function truncate_line_text(text)
-  return M.truncate_middle(text, {
-    no_truncate_max = 20,
-    part_len = 3,
-    joiner = '_',
-    camelcase = false,
-  })
+---@param str string
+---@param max_len number
+---@return string
+local function truncate_right(str, max_len)
+  if type(str) ~= 'string' then
+    return ''
+  end
+  if #str <= max_len then
+    return str
+  end
+  return str:sub(1, max_len - 1) .. '-'
 end
 
 ---@param marks_info blackboard.MarkInfo[]
@@ -174,11 +188,13 @@ end
 function M.parse_marks_info(marks_info)
   local blackboardLines = {}
   local functionNames = {}
+  local lineTextMeta = {}
 
   if not marks_info or #marks_info == 0 then
     return {
       blackboardLines = { 'No marks set' },
       functionNames = {},
+      lineTextMeta = {},
     }
   end
 
@@ -188,26 +204,99 @@ function M.parse_marks_info(marks_info)
   for _, mark_info in ipairs(marks_info) do
     local currentLine = #blackboardLines + 1
     local nearest_func = mark_info.nearest_func or ''
-    local line_text = nearest_func ~= '' and truncate_function_name(nearest_func) or truncate_line_text(mark_info.text)
+    local has_func = nearest_func ~= ''
 
-    if nearest_func ~= '' then
-      functionNames[currentLine] = line_text
+    local display_text
+    if has_func then
+      display_text = truncate_function_name(nearest_func)
+      functionNames[currentLine] = display_text
+    else
+      display_text = truncate_right(mark_info.line_text, default_truncate_opts.empty_fallback_len)
+      -- "a: " prefix is 3 characters
+      lineTextMeta[currentLine] = {
+        bufnr = mark_info.bufnr,
+        line = mark_info.line,
+        filetype = mark_info.filetype,
+        text = mark_info.line_text,
+        text_col = 3,
+      }
     end
 
-    table.insert(blackboardLines, string.format('%s: %s', mark_info.mark, line_text))
+    table.insert(blackboardLines, string.format('%s: %s', mark_info.mark, display_text))
     blackboard_state.mark_to_line[mark_info.mark] = currentLine
   end
 
   return {
     blackboardLines = blackboardLines,
     functionNames = functionNames,
+    lineTextMeta = lineTextMeta,
   }
+end
+
+---@param bufnr number
+---@param line_row1 number
+---@param filetype string
+---@return {start_col: number, end_col: number, hl_group: string}[]?
+local function get_line_treesitter_highlights(bufnr, line_row1, filetype)
+  if bufnr < 0 or not vim.api.nvim_buf_is_valid(bufnr) then
+    return nil
+  end
+
+  local lang = vim.treesitter.language.get_lang(filetype)
+  if not lang then
+    return nil
+  end
+
+  local ok_parser, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+  if not ok_parser or not parser then
+    return nil
+  end
+
+  local ok_query, query = pcall(vim.treesitter.query.get, lang, 'highlights')
+  if not ok_query or not query then
+    return nil
+  end
+
+  local ok_tree, trees = pcall(function()
+    return parser:parse { line_row1 - 1, line_row1 }
+  end)
+  if not ok_tree or not trees or not trees[1] then
+    return nil
+  end
+
+  local tree = trees[1]
+  local highlights = {}
+  local seen = {}
+
+  for id, node in query:iter_captures(tree:root(), bufnr, line_row1 - 1, line_row1) do
+    local name = query.captures[id]
+    local start_row, start_col, end_row, end_col = node:range()
+
+    if start_row == line_row1 - 1 and end_row == line_row1 - 1 then
+      local key = string.format('%d:%d:%s', start_col, end_col, name)
+      if not seen[key] then
+        seen[key] = true
+        table.insert(highlights, {
+          start_col = start_col,
+          end_col = end_col,
+          hl_group = '@' .. name,
+        })
+      end
+    end
+  end
+
+  table.sort(highlights, function(a, b)
+    return a.start_col < b.start_col
+  end)
+
+  return highlights
 end
 
 ---@param parsedMarks blackboard.ParsedMarks
 function M.add_highlights(parsedMarks)
   local blackboardLines = parsedMarks.blackboardLines
   local functionNames = parsedMarks.functionNames
+  local lineTextMeta = parsedMarks.lineTextMeta
   vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
   vim.api.nvim_set_hl(0, 'BlackboardFunctionName', { link = 'Function' })
 
@@ -231,6 +320,43 @@ function M.add_highlights(parsedMarks)
         ---@diagnostic disable-next-line: deprecated
         vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'BlackboardFunctionName', lineIdx - 1,
           start_col - 1, start_col - 1 + #func_name)
+      end
+    end
+
+    local meta = lineTextMeta and lineTextMeta[lineIdx]
+    if meta then
+      local highlights = get_line_treesitter_highlights(meta.bufnr, meta.line, meta.filetype)
+      if highlights then
+        local displayed_text = line:sub(meta.text_col + 1)
+        local displayed_len = #displayed_text
+
+        -- Get original line from buffer to find leading whitespace
+        local original_line = ''
+        if vim.api.nvim_buf_is_valid(meta.bufnr) then
+          local lines = vim.api.nvim_buf_get_lines(meta.bufnr, meta.line - 1, meta.line, false)
+          original_line = lines[1] or ''
+        end
+        -- Calculate leading whitespace offset
+        local trim_offset = #original_line - #vim.trim(original_line)
+
+        for _, hl in ipairs(highlights) do
+          -- Adjust for trim offset
+          local adj_start = hl.start_col - trim_offset
+          local adj_end = hl.end_col - trim_offset
+
+          -- Only apply if within displayed range
+          if adj_start < displayed_len and adj_end > 0 then
+            adj_start = math.max(adj_start, 0)
+            adj_end = math.min(adj_end, displayed_len)
+
+            local buf_start = meta.text_col + adj_start
+            local buf_end = meta.text_col + adj_end
+
+            ---@diagnostic disable-next-line: deprecated
+            vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, hl.hl_group, lineIdx - 1, buf_start,
+              buf_end)
+          end
+        end
       end
     end
   end
