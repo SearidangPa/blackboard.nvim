@@ -57,7 +57,7 @@ If tests are added later, prefer Plenary+Busted (common for Neovim Lua plugins).
 Use Neovim headless mode to catch syntax/runtime errors quickly.
 
 - Require the module:
-  - `nvim --headless -u NONE "+lua require('blackboard')" +q`
+  - `nvim --headless -u NONE "+set runtimepath^=/Users/searidangpa/.local/share/nvim/lazy/blackboard.nvim" "+lua require('blackboard')" +q- Require + call setup`
 
 - Require + call setup:
   - `nvim --headless -u NONE "+lua require('blackboard').setup({})" +q`
