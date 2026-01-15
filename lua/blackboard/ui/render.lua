@@ -184,6 +184,7 @@ function M.parse_marks_info(marks_info)
 
   local blackboard_state = state.state
 
+  -- TODO: also show ratio relative to function start and end, if available
   for _, mark_info in ipairs(marks_info) do
     local currentLine = #blackboardLines + 1
     local nearest_func = mark_info.nearest_func or ''
@@ -218,7 +219,8 @@ function M.add_highlights(parsedMarks)
       local endCol = line:find(markMatch .. ':')
       if endCol then
         ---@diagnostic disable-next-line: deprecated
-        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1, endCol)
+        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1,
+          endCol)
       end
     end
 
@@ -227,7 +229,8 @@ function M.add_highlights(parsedMarks)
       local start_col = line:find(func_name, 1, true)
       if start_col then
         ---@diagnostic disable-next-line: deprecated
-        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'BlackboardFunctionName', lineIdx - 1, start_col - 1, start_col - 1 + #func_name)
+        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'BlackboardFunctionName', lineIdx - 1,
+          start_col - 1, start_col - 1 + #func_name)
       end
     end
   end

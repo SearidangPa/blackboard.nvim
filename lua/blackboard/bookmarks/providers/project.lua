@@ -227,6 +227,10 @@ M.set_mark = function(mark)
   local util_ts = require 'blackboard.bookmarks.analysis'
   local func_ctx = util_ts.enclosing_function_context(bufnr, row1 - 1, col0)
 
+  -- TODO: do not store func_start_row, func_end_row
+  -- dynamically compute them on display
+  -- save the ratio of the position within the function instead,
+  -- so that it can be resolved even if the function moves
   local record = {
     filepath = relpath,
     fallback_line = row1,
@@ -260,6 +264,8 @@ M.unset_mark = function(mark)
     return
   end
 
+  -- TODO: load_db and save_db should be cached per project root to avoid repeated file I/O
+  -- only do I/O asynchronously
   local db = load_db(root)
   if not db.marks[mark] then
     return
