@@ -2,6 +2,16 @@ local state = require 'blackboard.state'
 
 local M = {}
 
+local highlight_namespace
+
+local function get_highlight_namespace()
+  if not highlight_namespace then
+    highlight_namespace = vim.api.nvim_create_namespace 'blackboard'
+  end
+
+  return highlight_namespace
+end
+
 -- === Truncation Logic ===
 
 local default_truncate_opts = {
@@ -161,14 +171,7 @@ end
 ---@field functionNames table<number, string>
 ---@field lineTextMeta table<number, blackboard.LineTextMeta>
 
-local function truncate_function_name(name)
-  local joiner = name:match '[%s_%-%+%.]' and '_' or ''
-  return M.truncate_middle(name, {
-    joiner = joiner,
-    camelcase = true,
-    part_len = 3,
-  })
-end
+local function truncate_function_name(name) end
 
 ---@param str string
 ---@param max_len number
@@ -208,21 +211,29 @@ function M.parse_marks_info(marks_info)
 
     local display_text
     if has_func then
-      display_text = truncate_function_name(nearest_func)
+      if #nearest_func <= default_truncate_opts.max_do_not_truncate then
+        display_text = nearest_func
+      else
+        display_text = M.truncate_middle(nearest_func, {
+          joiner = '',
+          camelcase = true,
+          part_len = 4,
+        })
+      end
       functionNames[currentLine] = display_text
     else
       display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
-      -- "a: " prefix is 3 characters
+      -- "a " prefix is 2 characters
       lineTextMeta[currentLine] = {
         bufnr = mark_info.bufnr,
         line = mark_info.line,
         filetype = mark_info.filetype,
         text = mark_info.line_text,
-        text_col = 3,
+        text_col = 2,
       }
     end
 
-    table.insert(blackboardLines, string.format('%s: %s', mark_info.mark, display_text))
+    table.insert(blackboardLines, string.format('%s %s', mark_info.mark, display_text))
     blackboard_state.mark_to_line[mark_info.mark] = currentLine
   end
 
@@ -301,25 +312,22 @@ function M.add_highlights(parsedMarks)
   vim.api.nvim_set_hl(0, 'BlackboardFunctionName', { link = 'Function' })
 
   local blackboard_state = state.state
+  local namespace = get_highlight_namespace()
 
   for lineIdx, line in ipairs(blackboardLines) do
-    local markMatch = line:match '([A-Za-z]):'
+    local markMatch = line:match '^([A-Za-z]) '
     if markMatch then
-      local endCol = line:find(markMatch .. ':')
-      if endCol then
-        ---@diagnostic disable-next-line: deprecated
-        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1,
-          endCol)
-      end
+      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, 0, { end_col = 1, hl_group = 'MarkHighlight' })
     end
 
     local func_name = functionNames and functionNames[lineIdx]
     if func_name then
       local start_col = line:find(func_name, 1, true)
       if start_col then
-        ---@diagnostic disable-next-line: deprecated
-        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'BlackboardFunctionName', lineIdx - 1,
-          start_col - 1, start_col - 1 + #func_name)
+        vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, start_col - 1, {
+          end_col = start_col - 1 + #func_name,
+          hl_group = 'BlackboardFunctionName',
+        })
       end
     end
 
@@ -352,9 +360,10 @@ function M.add_highlights(parsedMarks)
             local buf_start = meta.text_col + adj_start
             local buf_end = meta.text_col + adj_end
 
-            ---@diagnostic disable-next-line: deprecated
-            vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, hl.hl_group, lineIdx - 1, buf_start,
-              buf_end)
+            vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, buf_start, {
+              end_col = buf_end,
+              hl_group = hl.hl_group,
+            })
           end
         end
       end
