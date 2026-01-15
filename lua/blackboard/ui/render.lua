@@ -8,7 +8,59 @@ local default_truncate_opts = {
   empty_fallback_len = 8,
   joiner = '_',
   pattern = '[^%s_%-%+%.]+',
+  camelcase = false,
+  truncate_marker = '…',
 }
+
+local function split_on_pattern(str, pattern)
+  local parts = {}
+  for p in str:gmatch(pattern) do
+    parts[#parts + 1] = p
+  end
+  return parts
+end
+
+local function split_camelcase(str)
+  if not (str:match '%u' and str:match '%l') then
+    return { str }
+  end
+
+  local parts = {}
+  local current = ''
+  local prev = ''
+
+  for i = 1, #str do
+    local char = str:sub(i, i)
+    local next_char = str:sub(i + 1, i + 1)
+    local split_before = char:match '%u' and (prev:match '%l' or (next_char ~= '' and next_char:match '%l'))
+
+    if split_before and current ~= '' then
+      parts[#parts + 1] = current
+      current = char
+    else
+      current = current .. char
+    end
+
+    prev = char
+  end
+
+  if current ~= '' then
+    parts[#parts + 1] = current
+  end
+
+  return parts
+end
+
+---@param str string
+---@param opts TruncateMiddleOpts
+---@return string[]
+local function split_parts(str, opts)
+  local parts = split_on_pattern(str, opts.pattern)
+  if #parts <= 1 and opts.camelcase then
+    return split_camelcase(str)
+  end
+  return parts
+end
 
 ---@param opts? TruncateMiddleOpts
 local function normalize_truncate_opts(opts)
@@ -22,12 +74,34 @@ local function normalize_truncate_opts(opts)
     end
   end
 
+  local joiner = opts.joiner
+  if joiner == nil then
+    joiner = default_truncate_opts.joiner
+  end
+
+  local pattern = opts.pattern
+  if pattern == nil then
+    pattern = default_truncate_opts.pattern
+  end
+
+  local camelcase = opts.camelcase
+  if camelcase == nil then
+    camelcase = default_truncate_opts.camelcase
+  end
+
+  local truncate_marker = opts.truncate_marker
+  if truncate_marker == nil then
+    truncate_marker = default_truncate_opts.truncate_marker
+  end
+
   return {
     part_len = part_len,
     no_truncate_max = opts.no_truncate_max or (3 * part_len),
     empty_fallback_len = opts.empty_fallback_len or default_truncate_opts.empty_fallback_len,
-    joiner = opts.joiner or default_truncate_opts.joiner,
-    pattern = opts.pattern or default_truncate_opts.pattern,
+    joiner = joiner,
+    pattern = pattern,
+    camelcase = camelcase,
+    truncate_marker = truncate_marker,
   }
 end
 
@@ -37,6 +111,8 @@ end
 ---@field empty_fallback_len? number Number of characters to return when input string has no parts.
 ---@field joiner? string String used to join parts.
 ---@field pattern? string Lua pattern used to split the string into parts.
+---@field camelcase? boolean Split camelCase into parts when no separators.
+---@field truncate_marker? string Marker inserted when middle is collapsed.
 
 ---@param str string Input string to truncate.
 ---@param opts? TruncateMiddleOpts Options for truncation.
@@ -51,10 +127,7 @@ function M.truncate_middle(str, opts)
     return str
   end
 
-  local parts = {}
-  for p in str:gmatch(opts.pattern) do
-    parts[#parts + 1] = p
-  end
+  local parts = split_parts(str, opts)
 
   if #parts == 0 then
     return str:sub(1, opts.empty_fallback_len)
@@ -70,7 +143,7 @@ function M.truncate_middle(str, opts)
   local first = parts[1]:sub(1, opts.part_len)
   local second_last = parts[#parts - 1]:sub(1, opts.part_len)
   local last = parts[#parts]:sub(1, opts.part_len)
-  return table.concat({ first, second_last, last }, opts.joiner)
+  return table.concat({ first, opts.truncate_marker, second_last, last }, opts.joiner)
 end
 
 -- === Rendering Logic ===
@@ -78,6 +151,23 @@ end
 ---@class blackboard.ParsedMarks
 ---@field blackboardLines string[]
 ---@field functionNames string[]
+
+local function truncate_function_name(name)
+  local joiner = name:match '[%s_%-%+%.]' and '_' or ''
+  return M.truncate_middle(name, {
+    joiner = joiner,
+    camelcase = true,
+  })
+end
+
+local function truncate_line_text(text)
+  return M.truncate_middle(text, {
+    no_truncate_max = 20,
+    part_len = 3,
+    joiner = '_',
+    camelcase = false,
+  })
+end
 
 ---@param marks_info blackboard.MarkInfo[]
 ---@return blackboard.ParsedMarks
@@ -97,10 +187,10 @@ function M.parse_marks_info(marks_info)
   for _, mark_info in ipairs(marks_info) do
     local currentLine = #blackboardLines + 1
     local nearest_func = mark_info.nearest_func or ''
-    local line_text = nearest_func ~= '' and nearest_func or mark_info.text
+    local line_text = nearest_func ~= '' and truncate_function_name(nearest_func) or truncate_line_text(mark_info.text)
 
     if nearest_func ~= '' then
-      functionNames[currentLine] = nearest_func
+      functionNames[currentLine] = line_text
     end
 
     table.insert(blackboardLines, string.format('%s: %s', mark_info.mark, line_text))
@@ -141,6 +231,25 @@ function M.add_highlights(parsedMarks)
       end
     end
   end
+end
+
+---@param parsed_marks_info blackboard.ParsedMarks
+---@return number
+function M.desired_width(parsed_marks_info)
+  local max_width = 0
+  for _, line in ipairs(parsed_marks_info.blackboardLines) do
+    local width = vim.fn.strdisplaywidth(line)
+    if width > max_width then
+      max_width = width
+    end
+  end
+
+  if max_width == 0 then
+    max_width = 1
+  end
+
+  local max_allowed = math.max(vim.o.columns - 2, 1)
+  return math.min(max_width, max_allowed)
 end
 
 ---@param parsed_marks_info blackboard.ParsedMarks

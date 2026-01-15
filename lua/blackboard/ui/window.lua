@@ -33,14 +33,15 @@ function M.render_blackboard()
   vim.api.nvim_buf_set_lines(blackboard_state.blackboard_buf, 0, -1, false, parsed_marks_info.blackboardLines)
   render.add_highlights(parsed_marks_info)
 
-  local width = math.floor(vim.o.columns / 3)
+  local width = render.desired_width(parsed_marks_info)
   local height = render.desired_height(parsed_marks_info)
+  local col = math.max(vim.o.columns - width, 0)
 
   local cfg = {
     relative = 'editor',
     width = width,
     height = height,
-    col = vim.o.columns - width - 1,
+    col = col,
     row = 1,
     style = 'minimal',
     border = 'none',
