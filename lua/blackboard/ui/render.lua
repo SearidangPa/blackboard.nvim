@@ -5,7 +5,7 @@ local M = {}
 -- === Truncation Logic ===
 
 local default_truncate_opts = {
-  empty_fallback_len = 12,
+  max_do_not_truncate = 16,
   joiner = '_',
   pattern = '[^%s_%-%+%.]+',
   camelcase = false,
@@ -97,7 +97,7 @@ local function normalize_truncate_opts(opts)
   return {
     part_len = part_len,
     no_truncate_max = opts.no_truncate_max or (3 * part_len),
-    empty_fallback_len = opts.empty_fallback_len or default_truncate_opts.empty_fallback_len,
+    empty_fallback_len = opts.empty_fallback_len or default_truncate_opts.max_do_not_truncate,
     joiner = joiner,
     pattern = pattern,
     camelcase = camelcase,
@@ -211,7 +211,7 @@ function M.parse_marks_info(marks_info)
       display_text = truncate_function_name(nearest_func)
       functionNames[currentLine] = display_text
     else
-      display_text = truncate_right(mark_info.line_text, default_truncate_opts.empty_fallback_len)
+      display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
       -- "a: " prefix is 3 characters
       lineTextMeta[currentLine] = {
         bufnr = mark_info.bufnr,
