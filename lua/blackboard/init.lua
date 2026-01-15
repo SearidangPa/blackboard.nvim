@@ -1,35 +1,23 @@
 local config = require 'blackboard.config'
 local window = require 'blackboard.ui.window'
 local actions = require 'blackboard.bookmarks.actions'
+local project_provider = require 'blackboard.bookmarks.providers.project'
 
 local M = {}
-
-
----@return blackboard.MarkProvider
-local function get_provider()
-  if config.options.mark_provider then
-    return config.options.mark_provider
-  end
-  return require 'blackboard.bookmarks.providers.project'
-end
 
 --- Setup the plugin
 ---@param opts blackboard.Options
 M.setup = function(opts)
   config.setup(opts)
 
-  local provider = get_provider()
   if
-      type(provider) ~= 'table'
-      or type(provider.list_marks) ~= 'function'
-      or type(provider.set_mark) ~= 'function'
-      or type(provider.unset_mark) ~= 'function'
-      or type(provider.jump_to_mark) ~= 'function'
+    type(project_provider) ~= 'table'
+    or type(project_provider.list_marks) ~= 'function'
+    or type(project_provider.set_mark) ~= 'function'
+    or type(project_provider.unset_mark) ~= 'function'
+    or type(project_provider.jump_to_mark) ~= 'function'
   then
-    vim.notify(
-      'blackboard: mark_provider must implement list_marks/set_mark/unset_mark/jump_to_mark',
-      vim.log.levels.ERROR
-    )
+    vim.notify('blackboard: project mark provider must implement list_marks/set_mark/unset_mark/jump_to_mark', vim.log.levels.ERROR)
   end
 
   -- Setup keybindings

@@ -1,20 +1,11 @@
-local config = require 'blackboard.config'
 local state = require 'blackboard.state'
 local render = require 'blackboard.ui.render'
+local project_provider = require 'blackboard.bookmarks.providers.project'
 
 local M = {}
 
----@return blackboard.MarkProvider
-local function get_provider()
-  if config.options.mark_provider then
-    return config.options.mark_provider
-  end
-  return require 'blackboard.bookmarks.providers.project'
-end
-
 function M.render_blackboard()
-  local provider = get_provider()
-  local marks_info = provider.list_marks()
+  local marks_info = project_provider.list_marks()
   local blackboard_state = state.state
 
   if not vim.api.nvim_buf_is_valid(blackboard_state.blackboard_buf) then

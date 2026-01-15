@@ -10,14 +10,7 @@
 ---@field mark_to_line table<string, number>
 
 ---@class blackboard.Options
----@field mark_provider? blackboard.MarkProvider
 ---@field override_vim_m_key? boolean
-
----@class blackboard.MarkProvider
----@field list_marks fun(): blackboard.MarkInfo[]
----@field set_mark fun(mark: string)
----@field unset_mark fun(mark: string)
----@field jump_to_mark fun(mark: string)
 
 ---@class blackboard.MarkInfo
 ---@field mark string
