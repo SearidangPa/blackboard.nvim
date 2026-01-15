@@ -309,13 +309,13 @@ M.list_marks = function()
   end
 
   table.sort(marks, function(a, b)
+    if a.mark ~= b.mark then
+      return a.mark < b.mark
+    end
     if a.filepath ~= b.filepath then
       return a.filepath < b.filepath
     end
-    if a.line ~= b.line then
-      return a.line < b.line
-    end
-    return a.mark < b.mark
+    return a.line < b.line
   end)
 
   return marks
