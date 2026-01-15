@@ -11,6 +11,7 @@
 
 ---@class blackboard.Options
 ---@field mark_provider? blackboard.MarkProvider
+---@field override_vim_m_key? boolean
 
 ---@class blackboard.MarkProvider
 ---@field list_marks fun(): blackboard.MarkInfo[]

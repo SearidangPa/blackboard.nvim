@@ -15,7 +15,7 @@ end
 M.mark = function(mark)
   local provider = get_provider()
   provider.set_mark(mark)
-  window.rerender_if_open()
+  window.render_blackboard()
 end
 
 ---@param mark string
@@ -29,7 +29,7 @@ end
 M.jump = function(mark)
   local provider = get_provider()
   provider.jump_to_mark(mark)
-  window.rerender_if_open()
+  window.render_blackboard()
 end
 
 return M
