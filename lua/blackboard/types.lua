@@ -10,8 +10,6 @@
 ---@field mark_to_line table<string, number>
 
 ---@class blackboard.Options
----@field not_under_func_symbol string
----@field under_func_symbol string
 ---@field mark_provider? blackboard.MarkProvider
 
 ---@class blackboard.MarkProvider

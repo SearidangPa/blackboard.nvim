@@ -24,7 +24,7 @@ function M.render_blackboard()
     vim.bo[blackboard_state.blackboard_buf].buflisted = false
     vim.bo[blackboard_state.blackboard_buf].swapfile = false
     if blackboard_state.original_buf and vim.api.nvim_buf_is_valid(blackboard_state.original_buf) then
-       vim.bo[blackboard_state.blackboard_buf].filetype = vim.bo[blackboard_state.original_buf].filetype
+      vim.bo[blackboard_state.blackboard_buf].filetype = vim.bo[blackboard_state.original_buf].filetype
     end
   end
 
@@ -32,7 +32,6 @@ function M.render_blackboard()
 
   vim.api.nvim_buf_set_lines(blackboard_state.blackboard_buf, 0, -1, false, parsed_marks_info.blackboardLines)
   render.add_highlights(parsed_marks_info)
-  render.add_virtual_lines(parsed_marks_info)
 
   local width = math.floor(vim.o.columns / 3)
   local height = render.desired_height(parsed_marks_info)

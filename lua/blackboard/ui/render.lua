@@ -1,4 +1,3 @@
-local config = require 'blackboard.config'
 local state = require 'blackboard.state'
 
 local M = {}
@@ -78,51 +77,48 @@ end
 
 ---@class blackboard.ParsedMarks
 ---@field blackboardLines string[]
----@field virtualLines string[]
+---@field functionNames string[]
 
 ---@param marks_info blackboard.MarkInfo[]
 ---@return blackboard.ParsedMarks
 function M.parse_marks_info(marks_info)
   local blackboardLines = {}
-  local virtualLines = {}
+  local functionNames = {}
 
   if not marks_info or #marks_info == 0 then
     return {
       blackboardLines = { 'No marks set' },
-      virtualLines = { '' },
+      functionNames = {},
     }
   end
 
-  local options = config.options
   local blackboard_state = state.state
 
   for _, mark_info in ipairs(marks_info) do
     local currentLine = #blackboardLines + 1
     local nearest_func = mark_info.nearest_func or ''
+    local line_text = nearest_func ~= '' and nearest_func or mark_info.text
 
-    virtualLines[currentLine] = nearest_func
-
-    local symbol = options.not_under_func_symbol
-    local func_prefix = ''
     if nearest_func ~= '' then
-      symbol = options.under_func_symbol
-      func_prefix = '(' .. nearest_func .. ') '
+      functionNames[currentLine] = nearest_func
     end
 
-    table.insert(blackboardLines, string.format('%s %s: %s%s', symbol, mark_info.mark, func_prefix, mark_info.text))
+    table.insert(blackboardLines, string.format('%s: %s', mark_info.mark, line_text))
     blackboard_state.mark_to_line[mark_info.mark] = currentLine
   end
 
   return {
     blackboardLines = blackboardLines,
-    virtualLines = virtualLines,
+    functionNames = functionNames,
   }
 end
 
 ---@param parsedMarks blackboard.ParsedMarks
 function M.add_highlights(parsedMarks)
   local blackboardLines = parsedMarks.blackboardLines
+  local functionNames = parsedMarks.functionNames
   vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
+  vim.api.nvim_set_hl(0, 'BlackboardFunctionName', { link = 'Function' })
 
   local blackboard_state = state.state
 
@@ -135,33 +131,15 @@ function M.add_highlights(parsedMarks)
         vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'MarkHighlight', lineIdx - 1, endCol - 1, endCol)
       end
     end
-  end
-end
 
----@param parsedMarks blackboard.ParsedMarks
-function M.add_virtual_lines(parsedMarks)
-  local ns_blackboard = vim.api.nvim_create_namespace 'blackboard_extmarks'
-  local blackboard_state = state.state
-  vim.api.nvim_buf_clear_namespace(blackboard_state.blackboard_buf, ns_blackboard, 0, -1)
-
-  vim.api.nvim_set_hl(0, 'BlackboardFunctionHeader', { link = 'Function' })
-
-  local last_seen_func = nil
-
-  for line_num, func_name in ipairs(parsedMarks.virtualLines) do
-    local extmark_line = line_num - 1
-    local func_line = func_name ~= '' and ('❯ ' .. func_name) or ''
-
-    if func_line ~= last_seen_func then
-      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, ns_blackboard, extmark_line, 0, {
-        virt_lines = { { { func_line, 'BlackboardFunctionHeader' } } },
-        virt_lines_above = true,
-        hl_mode = 'combine',
-        priority = 10,
-      })
+    local func_name = functionNames and functionNames[lineIdx]
+    if func_name then
+      local start_col = line:find(func_name, 1, true)
+      if start_col then
+        ---@diagnostic disable-next-line: deprecated
+        vim.api.nvim_buf_add_highlight(blackboard_state.blackboard_buf, -1, 'BlackboardFunctionName', lineIdx - 1, start_col - 1, start_col - 1 + #func_name)
+      end
     end
-
-    last_seen_func = func_line
   end
 end
 

@@ -2,8 +2,6 @@ local M = {}
 
 ---@type blackboard.Options
 M.options = {
-  not_under_func_symbol = '🔥',
-  under_func_symbol = '╰─',
   mark_provider = nil,
 }
 
