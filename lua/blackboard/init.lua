@@ -51,6 +51,15 @@ M.setup = function(opts)
     -- Default: just toggle binding
     vim.keymap.set('n', '<Leader>bb', M.toggle_mark_window, { desc = 'Blackboard: Toggle window' })
   end
+
+  -- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
+  local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
+  vim.api.nvim_create_autocmd('BufWritePost', {
+    group = blackboard_group,
+    callback = function()
+      window.rerender_if_open()
+    end,
+  })
 end
 
 M.toggle_mark_window = window.toggle_mark_window
