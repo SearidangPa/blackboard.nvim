@@ -58,6 +58,39 @@ M.mark = actions.mark
 M.unmark = actions.unmark
 M.jump = actions.jump
 
+--- Load marks into quickfix list
+---@param opts? { open?: boolean }
+M.to_quickfix = function(opts)
+  opts = opts or {}
+  local marks = project_provider.list_marks()
+
+  local qf_items = {}
+  local MAX_TEXT_LEN = 30
+  for _, mark in ipairs(marks) do
+    local context
+    if mark.nearest_func ~= '' then
+      context = string.format('in %s', mark.nearest_func)
+    else
+      context = mark.line_text:sub(1, MAX_TEXT_LEN)
+    end
+    qf_items[#qf_items + 1] = {
+      filename = mark.filepath,
+      lnum = mark.line,
+      col = mark.col + 1,
+      text = string.format('%s | %s', mark.mark, context),
+    }
+  end
+
+  vim.fn.setqflist({}, ' ', {
+    title = 'Blackboard Marks',
+    items = qf_items,
+  })
+
+  if opts.open ~= false then
+    vim.cmd 'copen'
+  end
+end
+
 vim.api.nvim_create_user_command('BlackboardToggle', M.toggle_mark_window, {
   desc = 'Toggle Blackboard',
 })
@@ -81,6 +114,12 @@ vim.api.nvim_create_user_command('BlackboardJump', function(cmd)
 end, {
   desc = 'Jump to project mark (a-z)',
   nargs = 1,
+})
+
+vim.api.nvim_create_user_command('BlackboardQuickfix', function()
+  M.to_quickfix()
+end, {
+  desc = 'Load blackboard marks into quickfix',
 })
 
 return M
