@@ -23,7 +23,6 @@ M.setup = function(opts)
 
   -- Setup sign column marks
   if config.options.show_signs then
-    vim.api.nvim_set_hl(0, 'BlackboardSign', { link = 'Identifier', default = true })
     local signs = require 'blackboard.ui.signs'
     signs.setup_autocmds()
   end

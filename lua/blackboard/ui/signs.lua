@@ -1,18 +1,33 @@
 local M = {}
 
-local sign_namespace
+local signs_defined = false
 
-local function get_sign_namespace()
-  if not sign_namespace then
-    sign_namespace = vim.api.nvim_create_namespace 'blackboard_signs'
-  end
-  return sign_namespace
+local function define_highlight()
+  vim.api.nvim_set_hl(0, 'BlackboardSign', { fg = '#f1c232' })
 end
 
----@param mark string
----@return number
-local function mark_to_id(mark)
-  return string.byte(mark)
+local function ensure_signs_defined()
+  if signs_defined then
+    return
+  end
+
+  define_highlight()
+
+  -- Re-apply highlight after colorscheme changes
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    group = vim.api.nvim_create_augroup('blackboard_sign_hl', { clear = true }),
+    callback = define_highlight,
+  })
+
+  -- Define signs for each letter a-z
+  for i = 0, 25 do
+    local letter = string.char(97 + i)
+    vim.fn.sign_define('BlackboardMark_' .. letter, {
+      text = letter,
+      texthl = 'BlackboardSign',
+    })
+  end
+  signs_defined = true
 end
 
 ---@param bufnr number
@@ -23,15 +38,14 @@ function M.place_sign(bufnr, mark, line)
     return
   end
 
-  local ns = get_sign_namespace()
+  ensure_signs_defined()
 
-  -- Remove existing sign for this mark first (if any)
-  pcall(vim.api.nvim_buf_del_extmark, bufnr, ns, mark_to_id(mark))
+  -- Remove existing sign for this mark first
+  vim.fn.sign_unplace('blackboard_signs', { buffer = bufnr, id = string.byte(mark) })
 
-  vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
-    sign_text = mark,
-    sign_hl_group = 'BlackboardSign',
-    id = mark_to_id(mark),
+  -- Place new sign
+  vim.fn.sign_place(string.byte(mark), 'blackboard_signs', 'BlackboardMark_' .. mark, bufnr, {
+    lnum = line,
     priority = 10,
   })
 end
@@ -43,8 +57,7 @@ function M.remove_sign(bufnr, mark)
     return
   end
 
-  local ns = get_sign_namespace()
-  pcall(vim.api.nvim_buf_del_extmark, bufnr, ns, mark_to_id(mark))
+  vim.fn.sign_unplace('blackboard_signs', { buffer = bufnr, id = string.byte(mark) })
 end
 
 ---@param bufnr number
@@ -53,8 +66,7 @@ function M.clear_all_signs(bufnr)
     return
   end
 
-  local ns = get_sign_namespace()
-  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+  vim.fn.sign_unplace('blackboard_signs', { buffer = bufnr })
 end
 
 ---@param bufnr number
