@@ -351,7 +351,7 @@ vim.api.nvim_create_autocmd('ColorScheme', {
     local theme_loader = require("theme-loader")
     local is_light_mode = theme_loader.cached_is_light_mode
     if is_light_mode then
-      vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#276983' })
+      vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#EA9D35' })
     else
       vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
     end

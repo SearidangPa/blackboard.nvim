@@ -11,7 +11,7 @@ local function get_signs_namespace()
 end
 
 local function define_highlight()
-  vim.api.nvim_set_hl(0, 'BlackboardSign', { fg = '#f1c232' })
+  vim.api.nvim_set_hl(0, 'BlackboardSign', { link = 'MarkHighlight' })
 end
 
 local function ensure_signs_initialized()
