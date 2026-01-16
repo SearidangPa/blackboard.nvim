@@ -278,8 +278,8 @@ function M.parse_marks_info(marks_info)
         return ratio_a < ratio_b
       end)
       local marks_text = table.concat(
-        vim.tbl_map(function(entry)
-          return entry.mark
+        vim.tbl_map(function(mark_entry)
+          return mark_entry.mark
         end, group.marks),
         ' '
       )

@@ -178,9 +178,9 @@ end
 
 ---@param bufnr number
 ---@param row0 number
----@param col0 number
+---@param _col0 number
 ---@return blackboard.FunctionContext?
-function M.enclosing_function_context(bufnr, row0, col0)
+function M.enclosing_function_context(bufnr, row0, _col0)
   local ft = vim.bo[bufnr].filetype
   if ft == '' then
     return nil
