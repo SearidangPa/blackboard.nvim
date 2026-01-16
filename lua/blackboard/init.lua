@@ -71,41 +71,5 @@ M.to_quickfix = function(opts)
   end
 end
 
-vim.api.nvim_create_user_command('BlackboardToggle', M.toggle_mark_window, {
-  desc = 'Toggle Blackboard',
-})
-
-vim.api.nvim_create_user_command('BlackboardMark', function(cmd)
-  M.mark(cmd.args)
-end, {
-  desc = 'Set project mark (a-z)',
-  nargs = 1,
-})
-
-vim.api.nvim_create_user_command('BlackboardUnmark', function(cmd)
-  M.unmark(cmd.args)
-end, {
-  desc = 'Unset project mark (a-z)',
-  nargs = 1,
-})
-
-vim.api.nvim_create_user_command('BlackboardClear', function()
-  M.clear_marks()
-end, {
-  desc = 'Clear all project marks',
-})
-
-vim.api.nvim_create_user_command('BlackboardJump', function(cmd)
-  M.jump(cmd.args)
-end, {
-  desc = 'Jump to project mark (a-z)',
-  nargs = 1,
-})
-
-vim.api.nvim_create_user_command('BlackboardQuickfix', function()
-  M.to_quickfix()
-end, {
-  desc = 'Load blackboard marks into quickfix',
-})
 
 return M
