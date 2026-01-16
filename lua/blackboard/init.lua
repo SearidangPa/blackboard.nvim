@@ -11,11 +11,11 @@ M.setup = function(opts)
   config.setup(opts)
 
   if
-    type(project_provider) ~= 'table'
-    or type(project_provider.list_marks) ~= 'function'
-    or type(project_provider.set_mark) ~= 'function'
-    or type(project_provider.unset_mark) ~= 'function'
-    or type(project_provider.jump_to_mark) ~= 'function'
+      type(project_provider) ~= 'table'
+      or type(project_provider.list_marks) ~= 'function'
+      or type(project_provider.set_mark) ~= 'function'
+      or type(project_provider.unset_mark) ~= 'function'
+      or type(project_provider.jump_to_mark) ~= 'function'
   then
     local message = 'blackboard: project mark provider must implement list_marks/set_mark/unset_mark/jump_to_mark'
     vim.notify(message, vim.log.levels.ERROR)
@@ -44,13 +44,9 @@ M.setup = function(opts)
         M.jump(letter)
       end, { desc = 'Blackboard: Jump to mark ' .. letter })
     end
-
-    -- Toggle window with <leader>B
-    vim.keymap.set('n', '<Leader>B', M.toggle_mark_window, { desc = 'Blackboard: Toggle window' })
-  else
-    -- Default: just toggle binding
-    vim.keymap.set('n', '<Leader>bb', M.toggle_mark_window, { desc = 'Blackboard: Toggle window' })
   end
+  -- Toggle window with <leader>B
+  vim.keymap.set('n', '<Leader>B', M.toggle_mark_window, { desc = 'Blackboard: Toggle window' })
 
   -- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
   local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
