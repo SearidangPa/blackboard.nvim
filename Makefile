@@ -16,3 +16,5 @@ test:
 		-c q
 
 check: lua_lint lua_fmt_check
+
+pr_ready: check test
