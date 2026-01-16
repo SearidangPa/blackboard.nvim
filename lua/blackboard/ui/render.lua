@@ -345,12 +345,25 @@ local function get_line_treesitter_highlights(bufnr, line_row1, filetype)
   return highlights
 end
 
+vim.api.nvim_create_autocmd('ColorScheme', {
+  group = vim.api.nvim_create_augroup('BlackboardHighlights', { clear = true }),
+  callback = function()
+    local theme_loader = require("theme-loader")
+    local is_light_mode = theme_loader.cached_is_light_mode
+    if is_light_mode then
+      vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#276983' })
+    else
+      vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
+    end
+  end,
+})
+
 ---@param parsedMarks blackboard.ParsedMarks
 function M.add_highlights(parsedMarks)
   local blackboardLines = parsedMarks.blackboardLines
   local functionNames = parsedMarks.functionNames
   local lineTextMeta = parsedMarks.lineTextMeta
-  vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
+
   vim.api.nvim_set_hl(0, 'BlackboardFunctionName', { link = 'Function' })
 
   local blackboard_state = state.state
