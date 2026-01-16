@@ -40,6 +40,7 @@ end
 M.toggle_mark_window = window.toggle_mark_window
 M.mark = actions.mark
 M.unmark = actions.unmark
+M.clear_marks = actions.clear_marks
 M.jump = actions.jump
 
 --- Prompt user for a character (a-z) to set a mark
@@ -99,6 +100,12 @@ vim.api.nvim_create_user_command('BlackboardUnmark', function(cmd)
 end, {
   desc = 'Unset project mark (a-z)',
   nargs = 1,
+})
+
+vim.api.nvim_create_user_command('BlackboardClear', function()
+  M.clear_marks()
+end, {
+  desc = 'Clear all project marks',
 })
 
 vim.api.nvim_create_user_command('BlackboardJump', function(cmd)

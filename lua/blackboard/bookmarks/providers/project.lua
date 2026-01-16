@@ -13,10 +13,6 @@ local M = {}
 ---@field project_root string
 ---@field marks table<string, blackboard.ProjectMarkRecord>
 
-local function notify_err(msg)
-  vim.notify(msg, vim.log.levels.ERROR)
-end
-
 ---@param mark string
 ---@return boolean
 local function is_valid_mark(mark)
@@ -198,26 +194,26 @@ end
 ---@param mark string
 M.set_mark = function(mark)
   if not is_valid_mark(mark) then
-    notify_err 'BlackboardMark expects a single letter a-z'
+    vim.notify('BlackboardMark expects a single letter a-z', vim.log.levels.ERROR)
     return
   end
 
   local root = get_project_root()
   if not root then
-    notify_err 'BlackboardMark: not inside a git project (no .git found)'
+    vim.notify('BlackboardMark: not inside a git project (no .git found)', vim.log.levels.ERROR)
     return
   end
 
   local bufnr = vim.api.nvim_get_current_buf()
   local abs_path = vim.api.nvim_buf_get_name(bufnr)
   if abs_path == '' then
-    notify_err 'BlackboardMark: current buffer has no file path'
+    vim.notify('BlackboardMark: current buffer has no file path', vim.log.levels.ERROR)
     return
   end
 
   local relpath = to_project_relpath(root, abs_path)
   if not relpath then
-    notify_err 'BlackboardMark: file is outside git project'
+    vim.notify('BlackboardMark: file is outside git project', vim.log.levels.ERROR)
     return
   end
 
@@ -254,13 +250,13 @@ end
 ---@param mark string
 M.unset_mark = function(mark)
   if not is_valid_mark(mark) then
-    notify_err 'BlackboardUnmark expects a single letter a-z'
+    vim.notify('BlackboardUnmark expects a single letter a-z', vim.log.levels.ERROR)
     return
   end
 
   local root = get_project_root()
   if not root then
-    notify_err 'BlackboardUnmark: not inside a git project (no .git found)'
+    vim.notify('BlackboardUnmark: not inside a git project (no .git found)', vim.log.levels.ERROR)
     return
   end
 
@@ -272,6 +268,22 @@ M.unset_mark = function(mark)
   end
 
   db.marks[mark] = nil
+  save_db(root, db)
+end
+
+M.clear_marks = function()
+  local root = get_project_root()
+  if not root then
+    vim.notify('BlackboardClear: not inside a git project (no .git found)', vim.log.levels.ERROR)
+    return
+  end
+
+  local db = load_db(root)
+  if not db.marks or next(db.marks) == nil then
+    return
+  end
+
+  db.marks = {}
   save_db(root, db)
 end
 
@@ -331,27 +343,27 @@ end
 ---@param mark string
 M.jump_to_mark = function(mark)
   if not is_valid_mark(mark) then
-    notify_err 'BlackboardJump expects a single letter a-z'
+    vim.notify('BlackboardJump expects a single letter a-z', vim.log.levels.ERROR)
     return
   end
 
   local root = get_project_root()
   if not root then
-    notify_err 'BlackboardJump: not inside a git project (no .git found)'
+    vim.notify('BlackboardJump: not inside a git project (no .git found)', vim.log.levels.ERROR)
     return
   end
 
   local db = load_db(root)
   local record = db.marks[mark]
   if not record then
-    notify_err('BlackboardJump: no mark set for ' .. mark)
+    vim.notify('BlackboardJump: no mark set for ' .. mark, vim.log.levels.ERROR)
     return
   end
 
   local abs_path = to_abs_path(root, record.filepath)
   ---@diagnostic disable-next-line: undefined-field
   if not vim.uv.fs_stat(abs_path) then
-    notify_err('BlackboardJump: file missing: ' .. record.filepath)
+    vim.notify('BlackboardJump: file missing: ' .. record.filepath, vim.log.levels.ERROR)
     return
   end
 

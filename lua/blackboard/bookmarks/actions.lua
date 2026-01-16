@@ -42,6 +42,28 @@ M.unmark = function(mark)
   end
 end
 
+M.clear_marks = function()
+  local marks = nil
+  if config.options.show_signs then
+    marks = project_provider.list_marks()
+  end
+
+  project_provider.clear_marks()
+  window.rerender_if_open()
+
+  if config.options.show_signs and marks then
+    local signs = require 'blackboard.ui.signs'
+    local cleared = {}
+    for _, mark_info in ipairs(marks) do
+      local bufnr = mark_info.bufnr
+      if bufnr > 0 and vim.api.nvim_buf_is_valid(bufnr) and not cleared[bufnr] then
+        cleared[bufnr] = true
+        signs.clear_all_signs(bufnr)
+      end
+    end
+  end
+end
+
 ---@param mark string
 M.jump = function(mark)
   project_provider.jump_to_mark(mark)
