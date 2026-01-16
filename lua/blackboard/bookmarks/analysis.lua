@@ -5,14 +5,16 @@ local M = {}
 ---@field start_row number 0-based
 ---@field end_row number 0-based (exclusive)
 
-local function get_parser(bufnr)
-  local ft = vim.bo[bufnr].filetype
-  if ft == '' then
-    return nil
-  end
+local query_name = 'blackboard-function'
 
-  local lang = vim.treesitter.language.get_lang(ft)
-  return vim.treesitter.get_parser(bufnr, lang)
+---@param lang string
+---@return vim.treesitter.Query?
+local function get_function_query(lang)
+  local ok, query = pcall(vim.treesitter.query.get, lang, query_name)
+  if ok and query then
+    return query
+  end
+  return nil
 end
 
 ---@param node_type string
@@ -60,39 +62,44 @@ local function walk_nodes(root, cb)
   end
 end
 
+---@param query vim.treesitter.Query
 ---@param bufnr number
----@param row0 number
----@param col0 number
+---@param node any
 ---@return blackboard.FunctionContext?
-function M.enclosing_function_context(bufnr, row0, col0)
-  local parser = get_parser(bufnr)
-  if not parser then
-    return nil
-  end
+local function extract_context_from_match(query, bufnr, node)
+  local start_row, _, end_row, _ = node:range()
+  local func_name = nil
 
-  local node = vim.treesitter.get_node {
-    bufnr = bufnr,
-    pos = { row0, col0 },
-  }
-
-  if node then
-    local cur = node
-    while cur do
-      if is_function_node_type(cur:type()) then
-        local name = get_function_name(bufnr, cur)
-        if name ~= '' then
-          local start_row, _, end_row, _ = cur:range()
-          return {
-            func_name = name,
-            start_row = start_row,
-            end_row = end_row,
-          }
-        end
-      end
-      cur = cur:parent()
+  -- Look for @name capture within this function node
+  for id, capture_node in query:iter_captures(node, bufnr) do
+    local capture_name = query.captures[id]
+    if capture_name == 'name' then
+      func_name = vim.treesitter.get_node_text(capture_node, bufnr)
+      break
     end
   end
 
+  -- Fallback: try existing get_function_name helper
+  if not func_name or func_name == '' then
+    func_name = get_function_name(bufnr, node)
+  end
+
+  if func_name and func_name ~= '' then
+    return {
+      func_name = func_name,
+      start_row = start_row,
+      end_row = end_row,
+    }
+  end
+
+  return nil
+end
+
+---@param bufnr number
+---@param row0 number
+---@param parser any
+---@return blackboard.FunctionContext?
+local function enclosing_function_context_fallback(bufnr, row0, parser)
   local tree = parser:parse()[1]
   if not tree then
     return nil
@@ -132,13 +139,9 @@ end
 
 ---@param bufnr number
 ---@param approx_start_row number
+---@param parser any
 ---@return blackboard.FunctionContext?
-function M.find_function_by_position(bufnr, approx_start_row)
-  local parser = get_parser(bufnr)
-  if not parser then
-    return nil
-  end
-
+local function find_function_by_position_fallback(bufnr, approx_start_row, parser)
   local tree = parser:parse()[1]
   if not tree then
     return nil
@@ -169,6 +172,111 @@ function M.find_function_by_position(bufnr, approx_start_row)
       }
     end
   end)
+
+  return best
+end
+
+---@param bufnr number
+---@param row0 number
+---@param col0 number
+---@return blackboard.FunctionContext?
+function M.enclosing_function_context(bufnr, row0, col0)
+  local ft = vim.bo[bufnr].filetype
+  if ft == '' then
+    return nil
+  end
+
+  local lang = vim.treesitter.language.get_lang(ft)
+  if not lang then
+    return nil
+  end
+
+  local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+  if not ok or not parser then
+    return nil
+  end
+
+  local tree = parser:parse()[1]
+  if not tree then
+    return nil
+  end
+
+  local query = get_function_query(lang)
+  if not query then
+    -- Fall back to existing behavior if no query file
+    return enclosing_function_context_fallback(bufnr, row0, parser)
+  end
+
+  local best = nil
+  local best_span = nil
+
+  for id, node in query:iter_captures(tree:root(), bufnr) do
+    local capture_name = query.captures[id]
+    if capture_name == 'function' then
+      local start_row, _, end_row, _ = node:range()
+
+      -- Check if cursor is within this function
+      if start_row <= row0 and row0 < end_row then
+        local span = end_row - start_row
+        if not best_span or span < best_span then
+          local ctx = extract_context_from_match(query, bufnr, node)
+          if ctx then
+            best = ctx
+            best_span = span
+          end
+        end
+      end
+    end
+  end
+
+  return best
+end
+
+---@param bufnr number
+---@param approx_start_row number
+---@return blackboard.FunctionContext?
+function M.find_function_by_position(bufnr, approx_start_row)
+  local ft = vim.bo[bufnr].filetype
+  if ft == '' then
+    return nil
+  end
+
+  local lang = vim.treesitter.language.get_lang(ft)
+  if not lang then
+    return nil
+  end
+
+  local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+  if not ok or not parser then
+    return nil
+  end
+
+  local tree = parser:parse()[1]
+  if not tree then
+    return nil
+  end
+
+  local query = get_function_query(lang)
+  if not query then
+    return find_function_by_position_fallback(bufnr, approx_start_row, parser)
+  end
+
+  local best = nil
+  local best_score = nil
+
+  for id, node in query:iter_captures(tree:root(), bufnr) do
+    local capture_name = query.captures[id]
+    if capture_name == 'function' then
+      local ctx = extract_context_from_match(query, bufnr, node)
+      if ctx then
+        local score = math.abs(ctx.start_row - approx_start_row)
+        if not best_score or score < best_score then
+          best = ctx
+          best_score = score
+        end
+      end
+    end
+  end
 
   return best
 end
