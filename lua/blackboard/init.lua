@@ -11,11 +11,11 @@ M.setup = function(opts)
   config.setup(opts)
 
   if
-      type(project_provider) ~= 'table'
-      or type(project_provider.list_marks) ~= 'function'
-      or type(project_provider.set_mark) ~= 'function'
-      or type(project_provider.unset_mark) ~= 'function'
-      or type(project_provider.jump_to_mark) ~= 'function'
+    type(project_provider) ~= 'table'
+    or type(project_provider.list_marks) ~= 'function'
+    or type(project_provider.set_mark) ~= 'function'
+    or type(project_provider.unset_mark) ~= 'function'
+    or type(project_provider.jump_to_mark) ~= 'function'
   then
     local message = 'blackboard: project mark provider must implement list_marks/set_mark/unset_mark/jump_to_mark'
     vim.notify(message, vim.log.levels.ERROR)
@@ -26,27 +26,6 @@ M.setup = function(opts)
     local signs = require 'blackboard.ui.signs'
     signs.setup_autocmds()
   end
-
-  -- Setup keybindings
-  if config.options.override_vim_m_key then
-    -- Override m key to set marks
-    vim.keymap.set('n', 'm', function()
-      local char = vim.fn.getcharstr()
-      if char:match '^[a-z]$' then
-        M.mark(char)
-      end
-    end, { desc = 'Blackboard: Set project mark' })
-
-    -- Bind <leader>b{a-z} to jump to marks
-    for i = 0, 25 do
-      local letter = string.char(97 + i)
-      vim.keymap.set('n', '<Leader>b' .. letter, function()
-        M.jump(letter)
-      end, { desc = 'Blackboard: Jump to mark ' .. letter })
-    end
-  end
-  -- Toggle window with <leader>B
-  vim.keymap.set('n', '<Leader>B', M.toggle_mark_window, { desc = 'Blackboard: Toggle window' })
 
   -- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
   local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
@@ -62,6 +41,14 @@ M.toggle_mark_window = window.toggle_mark_window
 M.mark = actions.mark
 M.unmark = actions.unmark
 M.jump = actions.jump
+
+--- Prompt user for a character (a-z) to set a mark
+M.prompt_mark = function()
+  local char = vim.fn.getcharstr()
+  if char:match '^[a-z]$' then
+    M.mark(char)
+  end
+end
 
 --- Load marks into quickfix list
 ---@param opts? { open?: boolean }

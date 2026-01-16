@@ -2,7 +2,6 @@ local M = {}
 
 ---@type blackboard.Options
 M.options = {
-  override_vim_m_key = false,
   show_signs = true,
 }
 

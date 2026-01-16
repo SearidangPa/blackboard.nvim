@@ -11,7 +11,6 @@
 ---@field sign_autocmd_group? number
 
 ---@class blackboard.Options
----@field override_vim_m_key? boolean
 ---@field show_signs? boolean
 
 ---@class blackboard.MarkInfo
