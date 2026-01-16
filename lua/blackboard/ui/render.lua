@@ -193,7 +193,7 @@ function M.parse_marks_info(marks_info)
 
   if not marks_info or #marks_info == 0 then
     return {
-      blackboardLines = { 'No marks set' },
+      blackboardLines = { '' },
       functionNames = {},
       lineTextMeta = {},
     }
