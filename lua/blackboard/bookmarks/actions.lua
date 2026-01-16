@@ -18,30 +18,6 @@ M.mark = function(mark)
   end
 end
 
----@param mark string
-M.unmark = function(mark)
-  -- Get mark info before removal to know which buffer to update
-  local mark_info = nil
-  if config.options.show_signs then
-    local marks = project_provider.list_marks()
-    for _, m in ipairs(marks) do
-      if m.mark == mark then
-        mark_info = m
-        break
-      end
-    end
-  end
-
-  project_provider.unset_mark(mark)
-  window.rerender_if_open()
-
-  -- Remove sign
-  if config.options.show_signs and mark_info and mark_info.bufnr > 0 then
-    local signs = require 'blackboard.ui.signs'
-    signs.remove_sign(mark_info.bufnr, mark)
-  end
-end
-
 M.clear_marks = function()
   local marks = nil
   if config.options.show_signs then

@@ -9,18 +9,6 @@ local M = {}
 ---@param opts blackboard.Options
 M.setup = function(opts)
   config.setup(opts)
-
-  if
-    type(project_provider) ~= 'table'
-    or type(project_provider.list_marks) ~= 'function'
-    or type(project_provider.set_mark) ~= 'function'
-    or type(project_provider.unset_mark) ~= 'function'
-    or type(project_provider.jump_to_mark) ~= 'function'
-  then
-    local message = 'blackboard: project mark provider must implement list_marks/set_mark/unset_mark/jump_to_mark'
-    vim.notify(message, vim.log.levels.ERROR)
-  end
-
   -- Setup sign column marks
   if config.options.show_signs then
     local signs = require 'blackboard.ui.signs'
@@ -39,7 +27,6 @@ end
 
 M.toggle_mark_window = window.toggle_mark_window
 M.mark = actions.mark
-M.unmark = actions.unmark
 M.clear_marks = actions.clear_marks
 M.jump = actions.jump
 

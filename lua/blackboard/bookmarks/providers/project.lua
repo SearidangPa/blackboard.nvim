@@ -247,30 +247,6 @@ M.set_mark = function(mark)
   end
 end
 
----@param mark string
-M.unset_mark = function(mark)
-  if not is_valid_mark(mark) then
-    vim.notify('BlackboardUnmark expects a single letter a-z', vim.log.levels.ERROR)
-    return
-  end
-
-  local root = get_project_root()
-  if not root then
-    vim.notify('BlackboardUnmark: not inside a git project (no .git found)', vim.log.levels.ERROR)
-    return
-  end
-
-  -- TODO: load_db and save_db should be cached per project root to avoid repeated file I/O
-  -- only do I/O asynchronously
-  local db = load_db(root)
-  if not db.marks[mark] then
-    return
-  end
-
-  db.marks[mark] = nil
-  save_db(root, db)
-end
-
 M.clear_marks = function()
   local root = get_project_root()
   if not root then
