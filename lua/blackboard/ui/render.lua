@@ -201,26 +201,63 @@ function M.parse_marks_info(marks_info)
 
   local blackboard_state = state.state
 
+  local function format_function_name(func_name)
+    if #func_name <= default_truncate_opts.max_do_not_truncate then
+      return func_name
+    end
+
+    return M.truncate_middle(func_name, {
+      joiner = '',
+      camelcase = true,
+      part_len = 4,
+    })
+  end
+
+  local entries = {}
+  local func_groups = {}
+
   -- TODO: also show ratio relative to function start and end, if available
   for _, mark_info in ipairs(marks_info) do
-    local currentLine = #blackboardLines + 1
     local nearest_func = mark_info.nearest_func or ''
     local has_func = nearest_func ~= ''
 
-    local display_text
     if has_func then
-      if #nearest_func <= default_truncate_opts.max_do_not_truncate then
-        display_text = nearest_func
-      else
-        display_text = M.truncate_middle(nearest_func, {
-          joiner = '',
-          camelcase = true,
-          part_len = 4,
-        })
+      local key = string.format('%s\0%s', mark_info.filepath or '', nearest_func)
+      local group = func_groups[key]
+      if not group then
+        group = {
+          marks = {},
+          display_text = format_function_name(nearest_func),
+        }
+        func_groups[key] = group
+        entries[#entries + 1] = {
+          kind = 'function',
+          group = group,
+        }
       end
-      functionNames[currentLine] = display_text
+      group.marks[#group.marks + 1] = mark_info.mark
     else
-      display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
+      entries[#entries + 1] = {
+        kind = 'line',
+        mark_info = mark_info,
+      }
+    end
+  end
+
+  for _, entry in ipairs(entries) do
+    local currentLine = #blackboardLines + 1
+
+    if entry.kind == 'function' then
+      local group = entry.group
+      local marks_text = table.concat(group.marks, ' ')
+      table.insert(blackboardLines, string.format('%s %s', marks_text, group.display_text))
+      functionNames[currentLine] = group.display_text
+      for _, mark in ipairs(group.marks) do
+        blackboard_state.mark_to_line[mark] = currentLine
+      end
+    else
+      local mark_info = entry.mark_info
+      local display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
       -- a prefix is 2 characters
       lineTextMeta[currentLine] = {
         bufnr = mark_info.bufnr,
@@ -229,10 +266,9 @@ function M.parse_marks_info(marks_info)
         text = mark_info.line_text,
         text_col = 2,
       }
+      table.insert(blackboardLines, string.format('%s %s', mark_info.mark, display_text))
+      blackboard_state.mark_to_line[mark_info.mark] = currentLine
     end
-
-    table.insert(blackboardLines, string.format('%s %s', mark_info.mark, display_text))
-    blackboard_state.mark_to_line[mark_info.mark] = currentLine
   end
 
   return {
@@ -313,15 +349,30 @@ function M.add_highlights(parsedMarks)
   local namespace = get_highlight_namespace()
 
   for lineIdx, line in ipairs(blackboardLines) do
-    local markMatch = line:match '^([A-Za-z]) '
-    if markMatch then
-      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, 0, {
-        end_col = 1,
-        hl_group = 'MarkHighlight',
-      })
+    local func_name = functionNames and functionNames[lineIdx]
+    local marks_prefix
+
+    if func_name then
+      local func_start = line:find(func_name, 1, true)
+      if func_start and func_start > 1 then
+        marks_prefix = vim.trim(line:sub(1, func_start - 1))
+      end
+    else
+      marks_prefix = line:match '^([A-Za-z])%s'
     end
 
-    local func_name = functionNames and functionNames[lineIdx]
+    if marks_prefix then
+      for idx = 1, #marks_prefix do
+        local char = marks_prefix:sub(idx, idx)
+        if char:match '[A-Za-z]' then
+          vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, idx - 1, {
+            end_col = idx,
+            hl_group = 'MarkHighlight',
+          })
+        end
+      end
+    end
+
     if func_name then
       local start_col = line:find(func_name, 1, true)
       if start_col then
