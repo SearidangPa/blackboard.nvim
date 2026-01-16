@@ -297,6 +297,7 @@ M.list_marks = function()
       filetype = bufnr and vim.bo[bufnr].filetype or '',
       line = row1,
       col = col0,
+      ratio = record.ratio,
       nearest_func = func_name,
       text = string.format('%s:%d %s', record.filepath, row1, text),
       line_text = text,

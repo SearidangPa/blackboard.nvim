@@ -243,7 +243,10 @@ function M.parse_marks_info(marks_info)
           group = group,
         }
       end
-      group.marks[#group.marks + 1] = mark_info.mark
+      group.marks[#group.marks + 1] = {
+        mark = mark_info.mark,
+        ratio = mark_info.ratio,
+      }
     else
       entries[#entries + 1] = {
         kind = 'line',
@@ -257,11 +260,33 @@ function M.parse_marks_info(marks_info)
 
     if entry.kind == 'function' then
       local group = entry.group
-      local marks_text = table.concat(group.marks, ' ')
+      table.sort(group.marks, function(a, b)
+        local ratio_a = a.ratio
+        local ratio_b = b.ratio
+        if ratio_a == nil and ratio_b == nil then
+          return a.mark < b.mark
+        end
+        if ratio_a == nil then
+          return false
+        end
+        if ratio_b == nil then
+          return true
+        end
+        if ratio_a == ratio_b then
+          return a.mark < b.mark
+        end
+        return ratio_a < ratio_b
+      end)
+      local marks_text = table.concat(
+        vim.tbl_map(function(entry)
+          return entry.mark
+        end, group.marks),
+        ' '
+      )
       table.insert(blackboardLines, string.format('%s %s', marks_text, group.display_text))
       functionNames[currentLine] = group.display_text
-      for _, mark in ipairs(group.marks) do
-        blackboard_state.mark_to_line[mark] = currentLine
+      for _, entry_mark in ipairs(group.marks) do
+        blackboard_state.mark_to_line[entry_mark.mark] = currentLine
       end
     else
       local mark_info = entry.mark_info
@@ -348,7 +373,7 @@ end
 vim.api.nvim_create_autocmd('ColorScheme', {
   group = vim.api.nvim_create_augroup('BlackboardHighlights', { clear = true }),
   callback = function()
-    local theme_loader = require("theme-loader")
+    local theme_loader = require 'theme-loader'
     local is_light_mode = theme_loader.cached_is_light_mode
     if is_light_mode then
       vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#EA9D35' })

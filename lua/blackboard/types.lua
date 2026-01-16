@@ -21,6 +21,7 @@
 ---@field filetype string
 ---@field line number
 ---@field col number
+---@field ratio? number
 ---@field nearest_func string
 ---@field text string
 ---@field line_text string
