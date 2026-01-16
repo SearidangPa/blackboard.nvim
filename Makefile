@@ -10,4 +10,9 @@ lua_lint:
 	echo "===> Linting"
 	luacheck lua/ --globals vim
 
+test:
+	nvim --headless --noplugin -u scripts/tests/minimal.vim \
+		-c "PlenaryBustedDirectory tests/ { minimal_init = 'scripts/tests/minimal.vim' }" \
+		-c q
+
 check: lua_lint lua_fmt_check
