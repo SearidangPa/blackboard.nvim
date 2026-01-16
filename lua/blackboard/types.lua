@@ -8,9 +8,11 @@
 ---@field original_buf number
 ---@field filepath_to_content_lines table<string, string[]>
 ---@field mark_to_line table<string, number>
+---@field sign_autocmd_group? number
 
 ---@class blackboard.Options
 ---@field override_vim_m_key? boolean
+---@field show_signs? boolean
 
 ---@class blackboard.MarkInfo
 ---@field mark string

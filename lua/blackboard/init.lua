@@ -21,6 +21,13 @@ M.setup = function(opts)
     vim.notify(message, vim.log.levels.ERROR)
   end
 
+  -- Setup sign column marks
+  if config.options.show_signs then
+    vim.api.nvim_set_hl(0, 'BlackboardSign', { link = 'Identifier', default = true })
+    local signs = require 'blackboard.ui.signs'
+    signs.setup_autocmds()
+  end
+
   -- Setup keybindings
   if config.options.override_vim_m_key then
     -- Override m key to set marks
