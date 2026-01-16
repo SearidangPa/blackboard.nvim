@@ -202,12 +202,20 @@ function M.parse_marks_info(marks_info)
   local blackboard_state = state.state
 
   local function format_function_name(func_name)
-    if #func_name <= default_truncate_opts.max_do_not_truncate then
-      return func_name
+    -- Strip module/table prefix if present (e.g., "git_push.method" -> "method")
+    local method_name = func_name:match '[%.:]([^%.:]+)$' or func_name
+
+    if #method_name <= default_truncate_opts.max_do_not_truncate then
+      return method_name
     end
 
-    return M.truncate_middle(func_name, {
-      joiner = '',
+    local joiner = ''
+    if method_name:find '_' then
+      joiner = '_'
+    end
+
+    return M.truncate_middle(method_name, {
+      joiner = joiner,
       camelcase = true,
       part_len = 4,
     })

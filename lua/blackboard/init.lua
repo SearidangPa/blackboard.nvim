@@ -71,5 +71,4 @@ M.to_quickfix = function(opts)
   end
 end
 
-
 return M
