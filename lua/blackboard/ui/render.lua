@@ -154,7 +154,7 @@ function M.truncate_middle(str, opts)
   local second = parts[2]:sub(1, opts.part_len)
   local second_last = parts[#parts - 1]:sub(1, opts.part_len)
   local last = parts[#parts]:sub(1, opts.part_len)
-  return table.concat({ first, second, opts.truncate_marker, second_last, last }, opts.joiner)
+  return table.concat({ first, second }, opts.joiner) .. opts.truncate_marker .. table.concat({ second_last, last }, opts.joiner)
 end
 
 -- === Rendering Logic ===
