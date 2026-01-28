@@ -311,13 +311,23 @@ function M.parse_marks_info(marks_info)
   }
 end
 
+-- Treesitter parser/query cache per buffer (keyed by bufnr)
+-- Invalidated when buffer changedtick changes
+---@type table<number, { parser: any, query: any, tick: number }>
+local ts_highlight_cache = {}
+
 ---@param bufnr number
----@param line_row1 number
 ---@param filetype string
----@return {start_col: number, end_col: number, hl_group: string}[]?
-local function get_line_treesitter_highlights(bufnr, line_row1, filetype)
+---@return { parser: any, query: any }?
+local function get_cached_ts_data(bufnr, filetype)
   if bufnr < 0 or not vim.api.nvim_buf_is_valid(bufnr) then
     return nil
+  end
+
+  local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+  local cached = ts_highlight_cache[bufnr]
+  if cached and cached.tick == tick then
+    return cached
   end
 
   local lang = vim.treesitter.language.get_lang(filetype)
@@ -334,6 +344,23 @@ local function get_line_treesitter_highlights(bufnr, line_row1, filetype)
   if not ok_query or not query then
     return nil
   end
+
+  ts_highlight_cache[bufnr] = { parser = parser, query = query, tick = tick }
+  return ts_highlight_cache[bufnr]
+end
+
+---@param bufnr number
+---@param line_row1 number
+---@param filetype string
+---@return {start_col: number, end_col: number, hl_group: string}[]?
+local function get_line_treesitter_highlights(bufnr, line_row1, filetype)
+  local ts_data = get_cached_ts_data(bufnr, filetype)
+  if not ts_data then
+    return nil
+  end
+
+  local parser = ts_data.parser
+  local query = ts_data.query
 
   local ok_tree, trees = pcall(function()
     return parser:parse { line_row1 - 1, line_row1 }
@@ -373,8 +400,8 @@ end
 vim.api.nvim_create_autocmd('ColorScheme', {
   group = vim.api.nvim_create_augroup('BlackboardHighlights', { clear = true }),
   callback = function()
-    local theme_loader = require 'theme-loader'
-    local is_light_mode = theme_loader.cached_is_light_mode
+    local ok, theme_loader = pcall(require, 'theme-loader')
+    local is_light_mode = ok and theme_loader.cached_is_light_mode or false
     if is_light_mode then
       vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#EA9D35' })
     else
@@ -397,9 +424,10 @@ function M.add_highlights(parsedMarks)
   for lineIdx, line in ipairs(blackboardLines) do
     local func_name = functionNames and functionNames[lineIdx]
     local marks_prefix
+    local func_start -- cache find result to avoid duplicate search
 
     if func_name then
-      local func_start = line:find(func_name, 1, true)
+      func_start = line:find(func_name, 1, true)
       if func_start and func_start > 1 then
         marks_prefix = vim.trim(line:sub(1, func_start - 1))
       end
@@ -419,14 +447,12 @@ function M.add_highlights(parsedMarks)
       end
     end
 
-    if func_name then
-      local start_col = line:find(func_name, 1, true)
-      if start_col then
-        vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, start_col - 1, {
-          end_col = start_col - 1 + #func_name,
-          hl_group = 'BlackboardFunctionName',
-        })
-      end
+    -- Reuse cached func_start instead of calling find again
+    if func_name and func_start then
+      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, func_start - 1, {
+        end_col = func_start - 1 + #func_name,
+        hl_group = 'BlackboardFunctionName',
+      })
     end
 
     local meta = lineTextMeta and lineTextMeta[lineIdx]

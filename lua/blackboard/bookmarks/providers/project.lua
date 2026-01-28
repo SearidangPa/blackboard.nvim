@@ -89,6 +89,33 @@ local function save_db(root, db)
   vim.fn.writefile({ encoded }, path)
 end
 
+-- DB cache: mtime-based invalidation to avoid repeated disk reads
+---@type table<string, { db: blackboard.ProjectMarksDb, mtime: number }>
+local db_cache = {}
+
+---@param root string
+---@return blackboard.ProjectMarksDb
+local function load_db_cached(root)
+  local path = db_path_for_root(root)
+  ---@diagnostic disable-next-line: undefined-field
+  local stat = vim.uv.fs_stat(path)
+  local mtime = stat and stat.mtime.sec or 0
+
+  local cached = db_cache[root]
+  if cached and cached.mtime == mtime then
+    return cached.db
+  end
+
+  local db = load_db(root)
+  db_cache[root] = { db = db, mtime = mtime }
+  return db
+end
+
+---@param root string
+local function invalidate_cache(root)
+  db_cache[root] = nil
+end
+
 ---@param root string
 ---@param abs_path string
 ---@return string?
@@ -149,6 +176,29 @@ end
 local function get_line_text(bufnr, row1)
   local line = vim.api.nvim_buf_get_lines(bufnr, row1 - 1, row1, false)[1] or ''
   return vim.trim(line)
+end
+
+---@param filepath string
+---@param line number
+---@return string?
+local function get_cached_line_text(filepath, line)
+  local bb_state = require 'blackboard.state'
+  local cache = bb_state.state.filepath_to_content_lines
+
+  if not cache[filepath] then
+    ---@diagnostic disable-next-line: undefined-field
+    local stat = vim.uv.fs_stat(filepath)
+    if not stat then
+      return nil
+    end
+    local ok, lines = pcall(vim.fn.readfile, filepath)
+    if ok and lines then
+      cache[filepath] = lines
+    end
+  end
+
+  local lines = cache[filepath]
+  return lines and lines[line] and vim.trim(lines[line]) or nil
 end
 
 ---@param row0 number
@@ -236,9 +286,10 @@ M.set_mark = function(mark)
     ratio = func_ctx and ratio_in_range(row1 - 1, func_ctx.start_row, func_ctx.end_row) or nil,
   }
 
-  local db = load_db(root)
+  local db = load_db_cached(root)
   db.marks[mark] = record
   save_db(root, db)
+  invalidate_cache(root)
 
   if line_text ~= '' then
     vim.notify(string.format('Blackboard: set %s (%s:%d)', mark, relpath, row1))
@@ -254,13 +305,14 @@ M.clear_marks = function()
     return
   end
 
-  local db = load_db(root)
+  local db = load_db_cached(root)
   if not db.marks or next(db.marks) == nil then
     return
   end
 
   db.marks = {}
   save_db(root, db)
+  invalidate_cache(root)
 end
 
 ---@return blackboard.MarkInfo[]
@@ -270,7 +322,7 @@ M.list_marks = function()
     return {}
   end
 
-  local db = load_db(root)
+  local db = load_db_cached(root)
   local marks = {}
 
   for mark, record in pairs(db.marks) do
@@ -317,6 +369,67 @@ M.list_marks = function()
   return marks
 end
 
+--- Lightweight version of list_marks that doesn't force-load buffers
+--- Use this for rendering when we don't need full buffer context
+---@return blackboard.MarkInfo[]
+M.list_marks_lightweight = function()
+  local root = get_project_root()
+  if not root then
+    return {}
+  end
+
+  local db = load_db_cached(root)
+  local marks = {}
+
+  for mark, record in pairs(db.marks) do
+    local abs_path = to_abs_path(root, record.filepath)
+    -- Only use buffer if already loaded
+    local bufnr = vim.fn.bufnr(abs_path)
+    local is_loaded = bufnr ~= -1 and vim.api.nvim_buf_is_loaded(bufnr)
+
+    local row1 = record.fallback_line
+    local col0 = record.col
+    local func_name = ''
+    local text = ''
+    local filetype = ''
+
+    if is_loaded then
+      row1, col0, func_name = resolve_mark_position(bufnr, record)
+      text = get_line_text(bufnr, row1)
+      filetype = vim.bo[bufnr].filetype
+    else
+      text = get_cached_line_text(abs_path, row1) or '<not loaded>'
+      filetype = vim.filetype.match { filename = abs_path } or ''
+    end
+
+    marks[#marks + 1] = {
+      mark = mark,
+      bufnr = bufnr > 0 and bufnr or -1,
+      filename = record.filepath,
+      filepath = abs_path,
+      filetype = filetype,
+      line = row1,
+      col = col0,
+      ratio = record.ratio,
+      nearest_func = func_name,
+      text = string.format('%s:%d %s', record.filepath, row1, text),
+      line_text = text,
+    }
+  end
+
+  table.sort(marks, function(a, b)
+    if a.mark ~= b.mark then
+      return a.mark < b.mark
+    end
+    if a.filepath ~= b.filepath then
+      return a.filepath < b.filepath
+    end
+    return a.line < b.line
+  end)
+
+  return marks
+end
+
 ---@param mark string
 M.jump_to_mark = function(mark)
   if not is_valid_mark(mark) then
@@ -330,7 +443,7 @@ M.jump_to_mark = function(mark)
     return
   end
 
-  local db = load_db(root)
+  local db = load_db_cached(root)
   local record = db.marks[mark]
   if not record then
     vim.notify('BlackboardJump: no mark set for ' .. mark, vim.log.levels.ERROR)

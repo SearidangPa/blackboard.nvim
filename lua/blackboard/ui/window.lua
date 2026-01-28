@@ -5,7 +5,7 @@ local project_provider = require 'blackboard.bookmarks.providers.project'
 local M = {}
 
 function M.render_blackboard()
-  local marks_info = project_provider.list_marks()
+  local marks_info = project_provider.list_marks_lightweight()
   local blackboard_state = state.state
 
   if not vim.api.nvim_buf_is_valid(blackboard_state.blackboard_buf) then

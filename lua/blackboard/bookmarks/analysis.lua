@@ -54,12 +54,18 @@ local function get_function_name(bufnr, node)
 end
 
 ---@param root any
----@param cb fun(node: any)
+---@param cb fun(node: any): boolean?
+---@return boolean
 local function walk_nodes(root, cb)
-  cb(root)
-  for child in root:iter_children() do
-    walk_nodes(child, cb)
+  if cb(root) then
+    return true
   end
+  for child in root:iter_children() do
+    if walk_nodes(child, cb) then
+      return true
+    end
+  end
+  return false
 end
 
 ---@param query vim.treesitter.Query
@@ -110,17 +116,17 @@ local function enclosing_function_context_fallback(bufnr, row0, parser)
 
   walk_nodes(tree:root(), function(n)
     if not is_function_node_type(n:type()) then
-      return
+      return false
     end
 
     local start_row, _, end_row, _ = n:range()
     if not (start_row <= row0 and row0 < end_row) then
-      return
+      return false
     end
 
     local name = get_function_name(bufnr, n)
     if name == '' then
-      return
+      return false
     end
 
     local span = end_row - start_row
@@ -132,6 +138,7 @@ local function enclosing_function_context_fallback(bufnr, row0, parser)
         end_row = end_row,
       }
     end
+    return false
   end)
 
   return best
@@ -152,12 +159,12 @@ local function find_function_by_position_fallback(bufnr, approx_start_row, parse
 
   walk_nodes(tree:root(), function(n)
     if not is_function_node_type(n:type()) then
-      return
+      return false
     end
 
     local name = get_function_name(bufnr, n)
     if name == '' then
-      return
+      return false
     end
 
     local start_row, _, end_row, _ = n:range()
@@ -170,7 +177,12 @@ local function find_function_by_position_fallback(bufnr, approx_start_row, parse
         start_row = start_row,
         end_row = end_row,
       }
+      -- Early exit if we found exact match
+      if score == 0 then
+        return true
+      end
     end
+    return false
   end)
 
   return best

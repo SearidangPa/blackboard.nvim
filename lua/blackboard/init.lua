@@ -5,6 +5,9 @@ local project_provider = require 'blackboard.bookmarks.providers.project'
 
 local M = {}
 
+-- Timer for debouncing BufWritePost re-renders
+local render_timer = nil
+
 --- Setup the plugin
 ---@param opts blackboard.Options
 M.setup = function(opts)
@@ -16,11 +19,18 @@ M.setup = function(opts)
   end
 
   -- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
+  -- Debounced to prevent rapid re-renders on frequent saves
   local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
   vim.api.nvim_create_autocmd('BufWritePost', {
     group = blackboard_group,
     callback = function()
-      window.rerender_if_open()
+      if render_timer then
+        render_timer:stop()
+      end
+      render_timer = vim.defer_fn(function()
+        window.rerender_if_open()
+        render_timer = nil
+      end, 100)
     end,
   })
 end
