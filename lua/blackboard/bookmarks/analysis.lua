@@ -7,13 +7,28 @@ local M = {}
 
 local query_name = 'blackboard-function'
 
+-- Cached query per language. false means missing for that lang.
+---@type table<string, vim.treesitter.Query|false>
+local query_cache = {}
+
+-- Cached function contexts per buffer, invalidated by changedtick.
+---@type table<number, { tick: number, lang: string, contexts: blackboard.FunctionContext[] }>
+local context_cache = {}
+
 ---@param lang string
 ---@return vim.treesitter.Query?
 local function get_function_query(lang)
+  if query_cache[lang] ~= nil then
+    return query_cache[lang] or nil
+  end
+
   local ok, query = pcall(vim.treesitter.query.get, lang, query_name)
   if ok and query then
+    query_cache[lang] = query
     return query
   end
+
+  query_cache[lang] = false
   return nil
 end
 
@@ -70,35 +85,91 @@ end
 
 ---@param query vim.treesitter.Query
 ---@param bufnr number
----@param node any
----@return blackboard.FunctionContext?
-local function extract_context_from_match(query, bufnr, node)
-  local start_row, _, end_row, _ = node:range()
-  local func_name = nil
+---@param root any
+---@return blackboard.FunctionContext[]
+local function build_function_contexts(query, bufnr, root)
+  local contexts = {}
+  local by_range = {}
 
-  -- Look for @name capture within this function node
-  for id, capture_node in query:iter_captures(node, bufnr) do
-    local capture_name = query.captures[id]
-    if capture_name == 'name' then
-      func_name = vim.treesitter.get_node_text(capture_node, bufnr)
-      break
+  for _, match in query:iter_matches(root, bufnr) do
+    local func_node = nil
+    local name_node = nil
+
+    if type(match) ~= 'table' then
+      goto continue
     end
+
+    for id, node in pairs(match) do
+      local capture_name = query.captures[id]
+      if type(node) == 'table' then
+        node = node[1]
+      end
+      if not node then
+        goto continue
+      end
+      if capture_name == 'function' then
+        func_node = node
+      elseif capture_name == 'name' then
+        name_node = node
+      end
+    end
+
+    if func_node then
+      local func_name = ''
+      if name_node then
+        func_name = vim.treesitter.get_node_text(name_node, bufnr)
+      end
+
+      if not func_name or func_name == '' then
+        func_name = get_function_name(bufnr, func_node)
+      end
+
+      if func_name and func_name ~= '' then
+        local start_row, _, end_row, _ = func_node:range()
+        local key = string.format('%d:%d', start_row, end_row)
+        if not by_range[key] then
+          by_range[key] = true
+          table.insert(contexts, {
+            func_name = func_name,
+            start_row = start_row,
+            end_row = end_row,
+          })
+        end
+      end
+    end
+    ::continue::
   end
 
-  -- Fallback: try existing get_function_name helper
-  if not func_name or func_name == '' then
-    func_name = get_function_name(bufnr, node)
+  return contexts
+end
+
+---@param bufnr number
+---@param lang string
+---@param parser any
+---@param query vim.treesitter.Query
+---@return blackboard.FunctionContext[]?
+local function get_cached_function_contexts(bufnr, lang, parser, query)
+  if bufnr < 0 or not vim.api.nvim_buf_is_valid(bufnr) then
+    return nil
   end
 
-  if func_name and func_name ~= '' then
-    return {
-      func_name = func_name,
-      start_row = start_row,
-      end_row = end_row,
-    }
+  local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+  local cached = context_cache[bufnr]
+  if cached and cached.tick == tick and cached.lang == lang then
+    return cached.contexts
   end
 
-  return nil
+  local ok_tree, trees = pcall(function()
+    return parser:parse()
+  end)
+  if not ok_tree or not trees or not trees[1] then
+    return nil
+  end
+
+  local root = trees[1]:root()
+  local contexts = build_function_contexts(query, bufnr, root)
+  context_cache[bufnr] = { tick = tick, lang = lang, contexts = contexts }
+  return contexts
 end
 
 ---@param bufnr number
@@ -208,35 +279,26 @@ function M.enclosing_function_context(bufnr, row0, _col0)
     return nil
   end
 
-  local tree = parser:parse()[1]
-  if not tree then
-    return nil
-  end
-
   local query = get_function_query(lang)
   if not query then
     -- Fall back to existing behavior if no query file
     return enclosing_function_context_fallback(bufnr, row0, parser)
   end
 
+  local contexts = get_cached_function_contexts(bufnr, lang, parser, query)
+  if not contexts then
+    return nil
+  end
+
   local best = nil
   local best_span = nil
 
-  for id, node in query:iter_captures(tree:root(), bufnr) do
-    local capture_name = query.captures[id]
-    if capture_name == 'function' then
-      local start_row, _, end_row, _ = node:range()
-
-      -- Check if cursor is within this function
-      if start_row <= row0 and row0 < end_row then
-        local span = end_row - start_row
-        if not best_span or span < best_span then
-          local ctx = extract_context_from_match(query, bufnr, node)
-          if ctx then
-            best = ctx
-            best_span = span
-          end
-        end
+  for _, ctx in ipairs(contexts) do
+    if ctx.start_row <= row0 and row0 < ctx.end_row then
+      local span = ctx.end_row - ctx.start_row
+      if not best_span or span < best_span then
+        best = ctx
+        best_span = span
       end
     end
   end
@@ -263,30 +325,24 @@ function M.find_function_by_position(bufnr, approx_start_row)
     return nil
   end
 
-  local tree = parser:parse()[1]
-  if not tree then
-    return nil
-  end
-
   local query = get_function_query(lang)
   if not query then
     return find_function_by_position_fallback(bufnr, approx_start_row, parser)
   end
 
+  local contexts = get_cached_function_contexts(bufnr, lang, parser, query)
+  if not contexts then
+    return nil
+  end
+
   local best = nil
   local best_score = nil
 
-  for id, node in query:iter_captures(tree:root(), bufnr) do
-    local capture_name = query.captures[id]
-    if capture_name == 'function' then
-      local ctx = extract_context_from_match(query, bufnr, node)
-      if ctx then
-        local score = math.abs(ctx.start_row - approx_start_row)
-        if not best_score or score < best_score then
-          best = ctx
-          best_score = score
-        end
-      end
+  for _, ctx in ipairs(contexts) do
+    local score = math.abs(ctx.start_row - approx_start_row)
+    if not best_score or score < best_score then
+      best = ctx
+      best_score = score
     end
   end
 

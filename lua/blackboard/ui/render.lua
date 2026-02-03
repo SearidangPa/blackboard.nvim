@@ -397,17 +397,21 @@ local function get_line_treesitter_highlights(bufnr, line_row1, filetype)
   return highlights
 end
 
+local function set_mark_highlight()
+  local ok, theme_loader = pcall(require, 'theme-loader')
+  local is_light_mode = ok and theme_loader.cached_is_light_mode or false
+  if is_light_mode then
+    vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#EA9D35' })
+  else
+    vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
+  end
+end
+
+set_mark_highlight()
+
 vim.api.nvim_create_autocmd('ColorScheme', {
   group = vim.api.nvim_create_augroup('BlackboardHighlights', { clear = true }),
-  callback = function()
-    local ok, theme_loader = pcall(require, 'theme-loader')
-    local is_light_mode = ok and theme_loader.cached_is_light_mode or false
-    if is_light_mode then
-      vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#EA9D35' })
-    else
-      vim.api.nvim_set_hl(0, 'MarkHighlight', { fg = '#f1c232' })
-    end
-  end,
+  callback = set_mark_highlight,
 })
 
 ---@param parsedMarks blackboard.ParsedMarks
