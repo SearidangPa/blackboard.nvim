@@ -315,6 +315,35 @@ M.clear_marks = function()
   invalidate_cache(root)
 end
 
+---@param mark string
+M.delete_mark = function(mark)
+  if not is_valid_mark(mark) then
+    vim.notify('DelMark expects a single letter a-z', vim.log.levels.ERROR)
+    return
+  end
+
+  local root = get_project_root()
+  if not root then
+    vim.notify('DelMark: not inside a git project (no .git found)', vim.log.levels.ERROR)
+    return
+  end
+
+  local db = load_db_cached(root)
+  local record = db.marks[mark]
+  if not record then
+    vim.notify('DelMark: no mark set for ' .. mark, vim.log.levels.WARN)
+    return
+  end
+
+  local relpath = record.filepath
+  local line = record.fallback_line
+  db.marks[mark] = nil
+  save_db(root, db)
+  invalidate_cache(root)
+
+  vim.notify(string.format('Blackboard: deleted mark %s (%s:%d)', mark, relpath, line))
+end
+
 ---@return blackboard.MarkInfo[]
 M.list_marks = function()
   local root = get_project_root()

@@ -41,6 +41,29 @@ M.clear_marks = function()
 end
 
 ---@param mark string
+M.delete_mark = function(mark)
+  -- Capture mark info before deleting (for sign removal)
+  local mark_info = nil
+  if config.options.show_signs then
+    local marks = project_provider.list_marks_lightweight()
+    for _, m in ipairs(marks) do
+      if m.mark == mark then
+        mark_info = m
+        break
+      end
+    end
+  end
+
+  project_provider.delete_mark(mark)
+  window.rerender_if_open()
+
+  if config.options.show_signs and mark_info and mark_info.bufnr > 0 and vim.api.nvim_buf_is_valid(mark_info.bufnr) then
+    local signs = require 'blackboard.ui.signs'
+    signs.remove_sign(mark_info.bufnr, mark)
+  end
+end
+
+---@param mark string
 M.jump = function(mark)
   project_provider.jump_to_mark(mark)
   window.render_blackboard()
