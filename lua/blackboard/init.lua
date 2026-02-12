@@ -21,8 +21,14 @@ M.setup = function(opts)
   -- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
   -- Debounced to prevent rapid re-renders on frequent saves
   vim.api.nvim_create_user_command('DelMark', function(cmd_opts)
-    M.delete_mark(cmd_opts.args)
-  end, { nargs = 1 })
+    local mark = vim.trim(cmd_opts.args or '')
+    if mark == '' then
+      M.clear_marks()
+      return
+    end
+
+    M.delete_mark(mark)
+  end, { nargs = '?' })
 
   local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
   vim.api.nvim_create_autocmd('BufWritePost', {
