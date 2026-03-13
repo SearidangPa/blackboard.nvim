@@ -115,19 +115,23 @@ M.pick = function(opts)
 
 		local func_name = nearest_func ~= '' and short_function_name(nearest_func) or ''
 
+		local text
 		local display_text = {}
 		display_text[#display_text + 1] = { mark.mark .. ": ", "BlackboardSign" }
 		if func_name ~= '' then
 			display_text[#display_text + 1] = { func_name, "Function" }
+			text = func_name
 		else
 			local filename = mark.filename ~= '' and mark.filename or mark.filepath
 			local basename = vim.fn.fnamemodify(filename, ':t')
 			display_text[#display_text + 1] = { basename .. ':' .. mark.line, "Comment" }
+			text = basename
 		end
 
 
 		items[#items + 1] = {
 			mark = mark.mark,
+			text = text,
 			display = display_text,
 			file = mark.filepath,
 			pos = { mark.line, mark.col },
