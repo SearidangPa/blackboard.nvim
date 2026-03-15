@@ -1,5 +1,6 @@
 " covers all package managers i am willing to cover
 set rtp+=.
+set rtp+=../beaver.nvim
 set rtp+=../plenary.nvim
 set rtp+=../nvim-treesitter
 set rtp+=~/.vim/plugged/plenary.nvim

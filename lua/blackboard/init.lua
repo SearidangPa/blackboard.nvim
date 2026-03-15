@@ -102,14 +102,14 @@ M.pick = function(opts)
 		return
 	end
 
-	local analysis = require 'blackboard.bookmarks.analysis'
+	local beaver = require 'beaver'
 	local items = {}
 	for _, mark in ipairs(marks) do
 		local nearest_func = mark.nearest_func or ''
 		if nearest_func == '' and mark.bufnr > 0 and vim.api.nvim_buf_is_valid(mark.bufnr) then
-			local func_ctx = analysis.enclosing_function_context(mark.bufnr, mark.line - 1, mark.col)
-			if func_ctx and func_ctx.func_name ~= '' then
-				nearest_func = func_ctx.func_name
+			local func_ctx = beaver.enclosing_function(mark.bufnr, mark.line - 1)
+			if func_ctx and func_ctx.name ~= '' then
+				nearest_func = func_ctx.name
 			end
 		end
 

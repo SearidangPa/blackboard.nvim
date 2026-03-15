@@ -1,5 +1,5 @@
 -- luacheck: globals describe it assert before_each after_each
-local analysis = require 'blackboard.bookmarks.analysis'
+local beaver = require 'beaver'
 local eq = assert.are.same
 
 describe('treesitter', function()
@@ -25,10 +25,10 @@ describe('treesitter', function()
       'end',
     }
     local buffer = create_buffer(lines, 'lua')
-    local ctx = analysis.enclosing_function_context(buffer, 1, 0)
+    local ctx = beaver.enclosing_function(buffer, 1)
 
     assert.is_not_nil(ctx)
-    eq('greet', ctx.func_name)
+    eq('greet', ctx.name)
   end)
 
   it('finds a go function context', function()
@@ -40,9 +40,9 @@ describe('treesitter', function()
       '}',
     }
     local buffer = create_buffer(lines, 'go')
-    local ctx = analysis.enclosing_function_context(buffer, 3, 0)
+    local ctx = beaver.enclosing_function(buffer, 3)
 
     assert.is_not_nil(ctx)
-    eq('greet', ctx.func_name)
+    eq('greet', ctx.name)
   end)
 end)
