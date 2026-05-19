@@ -7,7 +7,6 @@
 ---@field original_win number
 ---@field original_buf number
 ---@field filepath_to_content_lines table<string, string[]>
----@field mark_to_line table<string, number>
 ---@field sign_autocmd_group? number
 
 ---@class blackboard.Options

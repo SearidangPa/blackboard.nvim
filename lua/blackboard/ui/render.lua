@@ -170,6 +170,7 @@ end
 ---@field blackboardLines string[]
 ---@field functionNames table<number, string>
 ---@field lineTextMeta table<number, blackboard.LineTextMeta>
+---@field lineMarks table<number, string[]>
 
 ---@param str string
 ---@param max_len number
@@ -190,16 +191,16 @@ function M.parse_marks_info(marks_info)
   local blackboardLines = {}
   local functionNames = {}
   local lineTextMeta = {}
+  local lineMarks = {}
 
   if not marks_info or #marks_info == 0 then
     return {
       blackboardLines = { '' },
       functionNames = {},
       lineTextMeta = {},
+      lineMarks = {},
     }
   end
-
-  local blackboard_state = state.state
 
   local function format_function_name(func_name)
     -- Strip module/table prefix if present (e.g., "git_push.method" -> "method")
@@ -285,9 +286,11 @@ function M.parse_marks_info(marks_info)
       )
       table.insert(blackboardLines, string.format('%s %s', marks_text, group.display_text))
       functionNames[currentLine] = group.display_text
+      local marks_on_line = {}
       for _, entry_mark in ipairs(group.marks) do
-        blackboard_state.mark_to_line[entry_mark.mark] = currentLine
+        marks_on_line[#marks_on_line + 1] = entry_mark.mark
       end
+      lineMarks[currentLine] = marks_on_line
     else
       local mark_info = entry.mark_info
       local display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
@@ -300,7 +303,7 @@ function M.parse_marks_info(marks_info)
         text_col = 2,
       }
       table.insert(blackboardLines, string.format('%s %s', mark_info.mark, display_text))
-      blackboard_state.mark_to_line[mark_info.mark] = currentLine
+      lineMarks[currentLine] = { mark_info.mark }
     end
   end
 
@@ -308,6 +311,7 @@ function M.parse_marks_info(marks_info)
     blackboardLines = blackboardLines,
     functionNames = functionNames,
     lineTextMeta = lineTextMeta,
+    lineMarks = lineMarks,
   }
 end
 
@@ -414,14 +418,15 @@ vim.api.nvim_create_autocmd('ColorScheme', {
 })
 
 ---@param parsedMarks blackboard.ParsedMarks
-function M.add_highlights(parsedMarks)
+---@param bufnr? number Target buffer for extmarks; defaults to state.state.blackboard_buf
+function M.add_highlights(parsedMarks, bufnr)
   local blackboardLines = parsedMarks.blackboardLines
   local functionNames = parsedMarks.functionNames
   local lineTextMeta = parsedMarks.lineTextMeta
 
   vim.api.nvim_set_hl(0, 'BlackboardFunctionName', { link = 'Function' })
 
-  local blackboard_state = state.state
+  local target_buf = bufnr or state.state.blackboard_buf
   local namespace = get_highlight_namespace()
 
   for lineIdx, line in ipairs(blackboardLines) do
@@ -442,7 +447,7 @@ function M.add_highlights(parsedMarks)
       for idx = 1, #marks_prefix do
         local char = marks_prefix:sub(idx, idx)
         if char:match '[A-Za-z]' then
-          vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, idx - 1, {
+          vim.api.nvim_buf_set_extmark(target_buf, namespace, lineIdx - 1, idx - 1, {
             end_col = idx,
             hl_group = 'MarkHighlight',
           })
@@ -452,7 +457,7 @@ function M.add_highlights(parsedMarks)
 
     -- Reuse cached func_start instead of calling find again
     if func_name and func_start then
-      vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, func_start - 1, {
+      vim.api.nvim_buf_set_extmark(target_buf, namespace, lineIdx - 1, func_start - 1, {
         end_col = func_start - 1 + #func_name,
         hl_group = 'BlackboardFunctionName',
       })
@@ -487,7 +492,7 @@ function M.add_highlights(parsedMarks)
             local buf_start = meta.text_col + adj_start
             local buf_end = meta.text_col + adj_end
 
-            vim.api.nvim_buf_set_extmark(blackboard_state.blackboard_buf, namespace, lineIdx - 1, buf_start, {
+            vim.api.nvim_buf_set_extmark(target_buf, namespace, lineIdx - 1, buf_start, {
               end_col = buf_end,
               hl_group = hl.hl_group,
             })

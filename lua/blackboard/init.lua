@@ -50,18 +50,12 @@ M.setup = function(opts)
 		signs.setup_autocmds()
 	end
 
+	vim.api.nvim_create_user_command('Blackboard', function()
+		require('blackboard.ui.manager').open()
+	end, { nargs = 0, desc = 'Open the Blackboard mark manager window' })
+
 	-- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
 	-- Debounced to prevent rapid re-renders on frequent saves
-	vim.api.nvim_create_user_command('DelMark', function(cmd_opts)
-		local mark = vim.trim(cmd_opts.args or '')
-		if mark == '' then
-			M.clear_marks()
-			return
-		end
-
-		M.delete_mark(mark)
-	end, { nargs = '?' })
-
 	local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
 	vim.api.nvim_create_autocmd('BufWritePost', {
 		group = blackboard_group,
@@ -82,6 +76,9 @@ M.mark = actions.mark
 M.clear_marks = actions.clear_marks
 M.delete_mark = actions.delete_mark
 M.jump = actions.jump
+M.open_blackboard = function()
+	require('blackboard.ui.manager').open()
+end
 
 --- Prompt user for a character (a-z) to set a mark
 M.prompt_mark = function()
@@ -117,17 +114,16 @@ M.pick = function(opts)
 
 		local text
 		local display_text = {}
-		display_text[#display_text + 1] = { mark.mark .. ": ", "BlackboardSign" }
+		display_text[#display_text + 1] = { mark.mark .. ': ', 'BlackboardSign' }
 		if func_name ~= '' then
-			display_text[#display_text + 1] = { func_name, "Function" }
+			display_text[#display_text + 1] = { func_name, 'Function' }
 			text = func_name
 		else
 			local filename = mark.filename ~= '' and mark.filename or mark.filepath
 			local basename = vim.fn.fnamemodify(filename, ':t')
-			display_text[#display_text + 1] = { basename .. ':' .. mark.line, "Comment" }
+			display_text[#display_text + 1] = { basename .. ':' .. mark.line, 'Comment' }
 			text = basename
 		end
-
 
 		items[#items + 1] = {
 			mark = mark.mark,
@@ -156,6 +152,5 @@ M.pick = function(opts)
 		end,
 	}
 end
-
 
 return M

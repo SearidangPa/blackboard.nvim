@@ -8,7 +8,6 @@ M.state = {
   original_win = -1,
   original_buf = -1,
   filepath_to_content_lines = {},
-  mark_to_line = {},
   sign_autocmd_group = nil,
 }
 

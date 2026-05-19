@@ -43,9 +43,14 @@ bb.clear_marks()
 ```
 
 ```vim
-:DelMark a
-:DelMark
+:BlackBoard
 ```
+
+`:BlackBoard` opens a focusable floating window listing the project's marks. Inside the window:
+
+- `d` — delete the mark(s) shown on the current line (a function group is removed in one keypress)
+- `D` — delete all marks
+- `q` / `<Esc>` — close the window
 
 ## Notes
 
