@@ -175,16 +175,6 @@ end
 ---@param str string
 ---@param max_len number
 ---@return string
-local function truncate_right(str, max_len)
-  if type(str) ~= 'string' then
-    return ''
-  end
-  if #str <= max_len then
-    return str
-  end
-  return str:sub(1, max_len - 1) .. '-'
-end
-
 ---@param marks_info blackboard.MarkInfo[]
 ---@return blackboard.ParsedMarks
 function M.parse_marks_info(marks_info)
@@ -206,20 +196,7 @@ function M.parse_marks_info(marks_info)
     -- Strip module/table prefix if present (e.g., "git_push.method" -> "method")
     local method_name = func_name:match '[%.:]([^%.:]+)$' or func_name
 
-    if #method_name <= default_truncate_opts.max_do_not_truncate then
-      return method_name
-    end
-
-    local joiner = ''
-    if method_name:find '_' then
-      joiner = '_'
-    end
-
-    return M.truncate_middle(method_name, {
-      joiner = joiner,
-      camelcase = true,
-      part_len = 4,
-    })
+    return method_name
   end
 
   local entries = {}
@@ -293,7 +270,7 @@ function M.parse_marks_info(marks_info)
       lineMarks[currentLine] = marks_on_line
     else
       local mark_info = entry.mark_info
-      local display_text = truncate_right(mark_info.line_text, default_truncate_opts.max_do_not_truncate)
+      local display_text = mark_info.line_text
       -- a prefix is 2 characters
       lineTextMeta[currentLine] = {
         bufnr = mark_info.bufnr,

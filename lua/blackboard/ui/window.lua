@@ -26,13 +26,13 @@ function M.render_blackboard()
 
   local width = render.desired_width(parsed_marks_info)
   local height = render.desired_height(parsed_marks_info)
-  local col = math.max(vim.o.columns - width, 0)
 
   local cfg = {
     relative = 'editor',
+    anchor = 'NE',
     width = width,
     height = height,
-    col = col,
+    col = vim.o.columns,
     row = 1,
     style = 'minimal',
     border = 'none',
