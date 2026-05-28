@@ -50,10 +50,6 @@ M.setup = function(opts)
     signs.setup_autocmds()
   end
 
-  vim.api.nvim_create_user_command('Blackboard', function()
-    require('blackboard.ui.manager').open()
-  end, { nargs = 0, desc = 'Open the Blackboard mark manager window' })
-
   -- Auto-refresh blackboard window on file save (updates function names after LSP rename, etc.)
   -- Debounced to prevent rapid re-renders on frequent saves
   local blackboard_group = vim.api.nvim_create_augroup('blackboard', { clear = true })
