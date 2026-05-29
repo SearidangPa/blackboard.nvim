@@ -40,10 +40,43 @@ local function short_function_name(func_name)
   return func_name:match '[%.:]([^%.:]+)$' or func_name
 end
 
+---@param name string
+---@param command function
+---@param opts? table
+local function create_user_command(name, command, opts)
+  opts = vim.tbl_extend('force', opts or {}, { force = true })
+  vim.api.nvim_create_user_command(name, command, opts)
+end
+
 --- Setup the plugin
 ---@param opts blackboard.Options
 M.setup = function(opts)
   config.setup(opts)
+
+  create_user_command('Blackboard', function()
+    M.open_blackboard()
+  end, { desc = 'Open Blackboard marks window' })
+
+  create_user_command('BlackBoard', function()
+    M.open_blackboard()
+  end, { desc = 'Open Blackboard marks window' })
+
+  create_user_command('BlackboardToggle', function()
+    M.toggle_mark_window()
+  end, { desc = 'Toggle Blackboard marks window' })
+
+  create_user_command('BlackboardMark', function(ctx)
+    M.mark(ctx.args)
+  end, { nargs = 1, desc = 'Set Blackboard mark' })
+
+  create_user_command('BlackboardJump', function(ctx)
+    M.jump(ctx.args)
+  end, { nargs = 1, desc = 'Jump to Blackboard mark' })
+
+  create_user_command('BlackboardClear', function()
+    M.clear_marks()
+  end, { desc = 'Clear Blackboard marks' })
+
   -- Setup sign column marks
   if config.options.show_signs then
     local signs = require 'blackboard.ui.signs'
