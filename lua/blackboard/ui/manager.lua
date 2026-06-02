@@ -8,6 +8,9 @@ local manager_buf = -1
 local manager_win = -1
 ---@type table<number, string[]>
 local line_marks = {}
+---@type table<number, string>
+local line_text = {}
+local rendering = false
 
 local function clamp(value, min_value, max_value)
   return math.min(math.max(value, min_value), max_value)
@@ -38,16 +41,22 @@ local function render_into_buffer(origin_buf)
     vim.bo[manager_buf].filetype = vim.bo[origin_buf].filetype
   end
 
+  rendering = true
   vim.bo[manager_buf].modifiable = true
   vim.api.nvim_buf_set_lines(manager_buf, 0, -1, false, parsed.blackboardLines)
-  vim.bo[manager_buf].modifiable = false
   render.add_highlights(parsed, manager_buf)
+  rendering = false
 
   line_marks = parsed.lineMarks or {}
+  line_text = parsed.blackboardLines or {}
   return parsed
 end
 
+local sync_deleted_lines
+
 local function close()
+  sync_deleted_lines(false)
+
   if vim.api.nvim_win_is_valid(manager_win) then
     vim.api.nvim_win_close(manager_win, true)
   end
@@ -57,6 +66,8 @@ local function close()
   manager_win = -1
   manager_buf = -1
   line_marks = {}
+  line_text = {}
+  rendering = false
 end
 
 local function refresh()
@@ -74,19 +85,42 @@ local function refresh()
   })
 end
 
-local function delete_current_line_marks()
-  if not vim.api.nvim_win_is_valid(manager_win) then
+---@param should_refresh? boolean
+sync_deleted_lines = function(should_refresh)
+  if rendering or not vim.api.nvim_buf_is_valid(manager_buf) then
     return
   end
-  local row = vim.api.nvim_win_get_cursor(manager_win)[1]
-  local marks = line_marks[row]
-  if not marks or #marks == 0 then
-    return
+
+  local remaining = {}
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(manager_buf, 0, -1, false)) do
+    remaining[line] = (remaining[line] or 0) + 1
   end
-  for _, mark in ipairs(marks) do
-    actions.delete_mark(mark)
+
+  local deleted_marks = {}
+  for row, marks in pairs(line_marks) do
+    if #marks > 0 then
+      local text = line_text[row] or ''
+      if (remaining[text] or 0) > 0 then
+        remaining[text] = remaining[text] - 1
+      else
+        for _, mark in ipairs(marks) do
+          deleted_marks[mark] = true
+        end
+      end
+    end
   end
-  refresh()
+
+  if next(deleted_marks) then
+    for mark in pairs(deleted_marks) do
+      actions.delete_mark(mark)
+    end
+  end
+
+  vim.bo[manager_buf].modified = false
+
+  if should_refresh then
+    refresh()
+  end
 end
 
 local function clear_all()
@@ -118,8 +152,9 @@ function M.open()
   local origin_buf = vim.api.nvim_get_current_buf()
 
   manager_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(manager_buf, 'blackboard://marks')
   vim.bo[manager_buf].bufhidden = 'wipe'
-  vim.bo[manager_buf].buftype = 'nofile'
+  vim.bo[manager_buf].buftype = 'acwrite'
   vim.bo[manager_buf].buflisted = false
   vim.bo[manager_buf].swapfile = false
 
@@ -145,17 +180,23 @@ function M.open()
   vim.wo[manager_win].winblend = 0
 
   local map_opts = { buffer = manager_buf, nowait = true, silent = true }
-  vim.keymap.set('n', 'd', delete_current_line_marks, map_opts)
   vim.keymap.set('n', 'D', clear_all, map_opts)
   vim.keymap.set('n', '<CR>', jump_to_current_line_mark, map_opts)
   vim.keymap.set('n', 'q', close, map_opts)
   vim.keymap.set('n', '<Esc>', close, map_opts)
 
-  vim.api.nvim_create_autocmd({ 'BufLeave', 'BufWipeout' }, {
+  vim.api.nvim_create_autocmd('BufWriteCmd', {
+    buffer = manager_buf,
+    callback = function()
+      sync_deleted_lines(true)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
     buffer = manager_buf,
     once = true,
     callback = function()
-      vim.schedule(close)
+      sync_deleted_lines(false)
     end,
   })
 end
