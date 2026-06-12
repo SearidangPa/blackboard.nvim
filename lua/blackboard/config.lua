@@ -3,6 +3,7 @@ local M = {}
 ---@type blackboard.Options
 M.options = {
   show_signs = true,
+  project_root = nil,
 }
 
 ---@param opts? blackboard.Options

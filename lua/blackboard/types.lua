@@ -11,6 +11,7 @@
 
 ---@class blackboard.Options
 ---@field show_signs? boolean
+---@field project_root? string|fun(bufnr: number): string?
 
 ---@class blackboard.MarkInfo
 ---@field mark string

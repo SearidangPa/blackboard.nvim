@@ -11,6 +11,7 @@ local line_marks = {}
 ---@type table<number, string>
 local line_text = {}
 local rendering = false
+local project_buf = -1
 
 local function clamp(value, min_value, max_value)
   return math.min(math.max(value, min_value), max_value)
@@ -34,7 +35,7 @@ local function compute_layout(parsed)
 end
 
 local function render_into_buffer(origin_buf)
-  local marks_info = project_provider.list_marks_lightweight()
+  local marks_info = project_provider.list_marks_lightweight(project_buf > 0 and project_buf or origin_buf)
   local parsed = render.parse_marks_info(marks_info)
 
   if origin_buf and vim.api.nvim_buf_is_valid(origin_buf) then
@@ -65,6 +66,7 @@ local function close()
   end
   manager_win = -1
   manager_buf = -1
+  project_buf = -1
   line_marks = {}
   line_text = {}
   rendering = false
@@ -114,6 +116,18 @@ sync_deleted_lines = function(should_refresh)
     for mark in pairs(deleted_marks) do
       actions.delete_mark(mark)
     end
+
+    -- Prevent repeated syncs (for example :wq triggers BufWriteCmd, then close/BufWipeout)
+    -- from trying to delete the same marks again and showing spurious warnings.
+    for row, marks in pairs(line_marks) do
+      local kept = {}
+      for _, mark in ipairs(marks) do
+        if not deleted_marks[mark] then
+          kept[#kept + 1] = mark
+        end
+      end
+      line_marks[row] = kept
+    end
   end
 
   vim.bo[manager_buf].modified = false
@@ -150,6 +164,7 @@ function M.open()
   end
 
   local origin_buf = vim.api.nvim_get_current_buf()
+  project_buf = origin_buf
 
   manager_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_name(manager_buf, 'blackboard://marks')

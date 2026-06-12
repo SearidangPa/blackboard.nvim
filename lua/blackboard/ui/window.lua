@@ -5,8 +5,12 @@ local project_provider = require 'blackboard.bookmarks.providers.project'
 local M = {}
 
 function M.render_blackboard()
-  local marks_info = project_provider.list_marks_lightweight()
   local blackboard_state = state.state
+  local project_buf = blackboard_state.original_buf
+  if not project_buf or not vim.api.nvim_buf_is_valid(project_buf) then
+    project_buf = vim.api.nvim_get_current_buf()
+  end
+  local marks_info = project_provider.list_marks_lightweight(project_buf)
 
   if not vim.api.nvim_buf_is_valid(blackboard_state.blackboard_buf) then
     blackboard_state.blackboard_buf = vim.api.nvim_create_buf(false, true)

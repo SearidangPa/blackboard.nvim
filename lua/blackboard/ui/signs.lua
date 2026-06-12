@@ -82,7 +82,7 @@ function M.refresh_signs_for_buffer(bufnr)
   end
 
   local project_provider = require 'blackboard.bookmarks.providers.project'
-  local marks = project_provider.list_marks()
+  local marks = project_provider.list_marks(bufnr)
 
   M.clear_all_signs(bufnr)
 

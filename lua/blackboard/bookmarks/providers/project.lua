@@ -34,9 +34,22 @@ local function db_path_for_root(root)
   return vim.fs.joinpath(dir, project_id(root) .. '.json')
 end
 
+---@param bufnr? number
 ---@return string?
-local function get_project_root()
-  local bufname = vim.api.nvim_buf_get_name(0)
+local function get_project_root(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+
+  local configured_root = require('blackboard.config').options.project_root
+  if type(configured_root) == 'function' then
+    local ok, root = pcall(configured_root, bufnr)
+    if ok and type(root) == 'string' and root ~= '' then
+      return vim.fs.normalize(root)
+    end
+  elseif type(configured_root) == 'string' and configured_root ~= '' then
+    return vim.fs.normalize(configured_root)
+  end
+
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
   local start = bufname ~= '' and vim.fs.dirname(bufname) or vim.fn.getcwd()
 
   local matches = vim.fs.find('.git', {
@@ -344,9 +357,10 @@ M.delete_mark = function(mark)
   vim.notify(string.format('Blackboard: deleted mark %s (%s:%d)', mark, relpath, line))
 end
 
+---@param bufnr? number Resolve project from this buffer. Defaults to current buffer.
 ---@return blackboard.MarkInfo[]
-M.list_marks = function()
-  local root = get_project_root()
+M.list_marks = function(bufnr)
+  local root = get_project_root(bufnr)
   if not root then
     return {}
   end
@@ -400,9 +414,10 @@ end
 
 --- Lightweight version of list_marks that doesn't force-load buffers
 --- Use this for rendering when we don't need full buffer context
+---@param bufnr? number Resolve project from this buffer. Defaults to current buffer.
 ---@return blackboard.MarkInfo[]
-M.list_marks_lightweight = function()
-  local root = get_project_root()
+M.list_marks_lightweight = function(bufnr)
+  local root = get_project_root(bufnr)
   if not root then
     return {}
   end
